@@ -64,56 +64,56 @@ def upload_subprocess(path_mongoSH_dir: str, upload: bool):
         )
 
 
-def validate_one_upload(
-    siaran_single: dict, path_mongoSH_dir: str, upload: bool = True
-):
-    output = siaranModel.model_validate(siaran_single).model_dump_json(indent=4)
+# def validate_one_upload(
+#     siaran_single: dict, path_mongoSH_dir: str, upload: bool = True
+# ):
+#     output = siaranModel.model_validate(siaran_single).model_dump_json(indent=4)
 
-    output_dir_path = os.path.join(path_mongoSH_dir, "datas")
-    if not os.path.exists(output_dir_path):
-        os.mkdir(output_dir_path)
+#     output_dir_path = os.path.join(path_mongoSH_dir, "datas")
+#     if not os.path.exists(output_dir_path):
+#         os.mkdir(output_dir_path)
 
-    with open(os.path.join(output_dir_path, "output.json"), "+w") as outFile:
-        outFile.write(f"[{output}]")
+#     with open(os.path.join(output_dir_path, "output.json"), "+w") as outFile:
+#         outFile.write(f"[{output}]")
 
-    upload_subprocess(path_mongoSH_dir, upload)
-
-
-def validate_long_upload(
-    siaran_long: list | longModel, path_mongoSH_dir: str, upload: bool = True, unique: bool = False
-):  
-    if unique:
-        siaran_long = dedup_long(siaran_long)
-
-    if type(siaran_long) is list:
-        inp = {"data": siaran_long}
-    elif type(siaran_long) is longModel:
-        inp = siaran_long
-    output = longModel.model_validate(inp).model_dump_json(indent=4)
-    output = output.replace('{\n    "data": ', "")[:-2]
-    output_dir_path = os.path.join(path_mongoSH_dir, "datas")
-    if not os.path.exists(output_dir_path):
-        os.mkdir(output_dir_path)
-
-    with open(os.path.join(output_dir_path, "output.json"), "+w") as outFile:
-        outFile.write(output)
-
-    upload_subprocess(path_mongoSH_dir, upload)
+#     upload_subprocess(path_mongoSH_dir, upload)
 
 
-def _dedup_loop(data_list: list):
-    data_dedup = []
+# def validate_long_upload(
+#     siaran_long: list | longModel, path_mongoSH_dir: str, upload: bool = True, unique: bool = False
+# ):  
+#     if unique:
+#         siaran_long = dedup_long(siaran_long)
 
-    for obj in data_list:
-        if obj not in data_dedup:
-            data_dedup.append(obj)
-    return data_dedup
+#     if type(siaran_long) is list:
+#         inp = {"data": siaran_long}
+#     elif type(siaran_long) is longModel:
+#         inp = siaran_long
+#     output = longModel.model_validate(inp).model_dump_json(indent=4)
+#     output = output.replace('{\n    "data": ', "")[:-2]
+#     output_dir_path = os.path.join(path_mongoSH_dir, "datas")
+#     if not os.path.exists(output_dir_path):
+#         os.mkdir(output_dir_path)
+
+#     with open(os.path.join(output_dir_path, "output.json"), "+w") as outFile:
+#         outFile.write(output)
+
+#     upload_subprocess(path_mongoSH_dir, upload)
 
 
-def dedup_long(siaran_long: list | longModel):
-    if type(siaran_long) is longModel:
-        siaran_long.data = _dedup_loop(siaran_long.data)
-        return siaran_long
+# def _dedup_loop(data_list: list):
+#     data_dedup = []
 
-    elif type(siaran_long) is list:
-        return _dedup_loop(siaran_long)
+#     for obj in data_list:
+#         if obj not in data_dedup:
+#             data_dedup.append(obj)
+#     return data_dedup
+
+
+# def dedup_long(siaran_long: list | longModel):
+#     if type(siaran_long) is longModel:
+#         siaran_long.data = _dedup_loop(siaran_long.data)
+#         return siaran_long
+
+#     elif type(siaran_long) is list:
+#         return _dedup_loop(siaran_long)

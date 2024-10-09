@@ -40,21 +40,21 @@ DIR = Path(__file__).parent.absolute()
 
 load_dotenv()
 
-# Ensure the log directory exists
-log_dir = DIR / "output" / "log"
-log_dir.mkdir(parents=True, exist_ok=True)
+# # Ensure the log directory exists
+# log_dir = DIR / "output" / "log"
+# log_dir.mkdir(parents=True, exist_ok=True)
 
-# Set up logging
-log_file = log_dir / "attachment_parser.log"
-log_file.touch(exist_ok=True)
+# # Set up logging
+# log_file = log_dir / "attachment_parser.log"
+# log_file.touch(exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler()
-    ]
+    # handlers=[
+    #     logging.FileHandler(log_file),
+    #     logging.StreamHandler()
+    # ]
 )
 
 
