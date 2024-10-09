@@ -46,7 +46,11 @@ class Response(BaseModel):
 # API Endpoints
 #================================================================================================
 #================================================================================================
-@app.post("/pdf_extract")
+@app.get("/api/py/helloFastApi")
+def hello_fast_api():
+    return {"message": "Hello from FastAPI"}
+
+@app.post("/api/py/pdf_extract")
 async def extract_pdf(request:PDFRequest)->dict:
     """ API endpoint to extract content from a PDF file
 
