@@ -1,8 +1,140 @@
-from fastapi import FastAPI
+# Imports
+#================================================================================================
+#================================================================================================
+import urllib
+from api.dbutils.data_validation import contentModel, attachementModel
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel,HttpUrl
+from api.pdf_parser import PDFExtractor
+from typing import List,Optional
 
-### Create FastAPI instance with custom docs and openapi url
+
+# Initialize the FastAPI app and models
+#================================================================================================
+#================================================================================================
 app = FastAPI(docs_url="/api/py/docs", openapi_url="/api/py/openapi.json")
+class PDFRequest(BaseModel):
+    url: HttpUrl
+    get_images: bool = False
 
-@app.get("/api/py/helloFastApi")
-def hello_fast_api():
-    return {"message": "Hello from FastAPI"}
+class ContentSummary(BaseModel):
+    plain_text_length: int
+    html_length: int
+    markdown_length: int
+    num_attachments: int
+
+class Metadata(BaseModel):
+    url: str
+    filename:str
+    filetype:str
+    num_pages:int
+    creation_date:str
+    processing_time:float
+    content_summary:ContentSummary
+    
+class PDFResponse(BaseModel):
+    metadata: Metadata
+    content: contentModel
+    attachments: Optional[List[attachementModel]]
+
+class Response(BaseModel):
+    success: bool
+    data : PDFResponse
+
+
+# API Endpoints
+#================================================================================================
+#================================================================================================
+@app.post("/pdf_extract")
+async def extract_pdf(request:PDFRequest)->dict:
+    """ API endpoint to extract content from a PDF file
+
+    Args:
+        request (PDFRequest): Request object containing the URL of the PDF file
+
+    Raises:
+        HTTPException: If the PDF extraction fails
+
+    Returns:
+        dict: A dictionary containing the extracted content and attachment models
+    """
+    try:
+        # Extract content from the PDF
+        extractor = PDFExtractor()
+        
+        # Call the process_pdf method to extract content from the PDF
+        content_model,attachment_model = extractor.process_pdf(
+            link = str(request.url), # change url from pydantic object to str since it expects a string
+            get_images=request.get_images,
+        )
+
+        # Raise an exception if the content model is None
+        if not content_model or not content_model.plain:
+            raise HTTPException(status_code=400, detail="Extracted content is empty")
+        
+        # Return the extracted content and attachment models
+        response =  Response(
+            success=True,
+            data=PDFResponse(
+                metadata=Metadata(
+                    url=str(request.url),
+                    creation_date=extractor.date,
+                    filename=extractor.filename,
+                    filetype=extractor.filetype,
+                    num_pages=extractor.num_pages,
+                    processing_time=round(extractor.time_taken,3),\
+                    content_summary=ContentSummary(
+                        plain_text_length=len(content_model.plain),
+                        html_length=len(content_model.html),
+                        markdown_length=len(content_model.markdown),
+                        num_attachments=len(attachment_model) if attachment_model else 0
+                    )
+                ),
+                content=content_model,
+                attachments=attachment_model,
+            )
+        )
+        
+        return JSONResponse(
+            status_code=200,
+            content=response.model_dump()
+        )
+        
+        
+    except urllib.error.URLError as e:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": {
+                    "code": 400,
+                    "message": f"URL Error: {str(e)}"
+                }
+            }
+        )
+        
+    except HTTPException as e:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": {
+                    "code": 400,
+                    "message": f"Error processing PDF: {str(e.detail)}"
+                }
+            }
+        )
+        
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": {
+                    "code": 500,
+                    "message": f"Error processing PDF: {str(e)}"
+                }
+            }
+        )
