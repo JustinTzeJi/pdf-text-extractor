@@ -26,10 +26,12 @@ class ContentSummary(BaseModel):
 
 class Metadata(BaseModel):
     url: str
-    filename:str
-    filetype:str
+    file_name:str
+    file_type:str
+    file_size:int
     num_pages:int
     creation_date:str
+    modified_date:str
     processing_time:float
     content_summary:ContentSummary
     
@@ -83,9 +85,11 @@ async def extract_pdf(request:PDFRequest)->dict:
             data=PDFResponse(
                 metadata=Metadata(
                     url=str(request.url),
-                    creation_date=extractor.date,
-                    filename=extractor.filename,
-                    filetype=extractor.filetype,
+                    creation_date=extractor.createDate,
+                    modified_date=extractor.modDate,
+                    file_name=extractor.filename,
+                    file_type=extractor.filetype,
+                    file_size=extractor.file_size,
                     num_pages=extractor.num_pages,
                     processing_time=round(extractor.time_taken,3),\
                     content_summary=ContentSummary(
