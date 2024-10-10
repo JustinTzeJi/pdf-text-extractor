@@ -67,10 +67,12 @@ class PDFExtractor:
     """
     def __init__(self):
         self.output_path = DIR / "output"
-        self.date = None
+        self.createDate = None
+        self.modDate = None
         self.pdf_dims = None
         self.filetype = None
         self.filename = None
+        self.file_size_mb = None
         self.num_pages = None
         self.url = None
         self.content_model = None
@@ -92,7 +94,15 @@ class PDFExtractor:
             f"  attachment_model: {self.attachment_model}\n"
             f")"
         )
-
+        
+    def get_metadata(self,doc:mupdf.Document):
+        # Get Metadata
+        self.createDate = datetime.strptime(doc.metadata['creationDate'][2:16], '%Y%m%d%H%M%S').strftime('%Y-%m-%dT%H:%M:%SZ')
+        self.modDate = datetime.strptime(doc.metadata['modDate'][2:16], '%Y%m%d%H%M%S').strftime('%Y-%m-%dT%H:%M:%SZ')
+        self.pdf_dims = f"{round(doc[0].rect.width)}x{round(doc[0].rect.height)}"
+        self.num_pages = len(doc)
+        self.filetype = doc.metadata['format'].split()[0].lower()
+        self.filename = (doc.metadata['title'] if doc.metadata['title'] else datetime.now().strftime('%Y%m%d%H%M%S')+ f".{self.filetype}")
 
     def get_pdf(self, link: str) -> mupdf.Document:
         """Download PDF from a given URL
@@ -139,11 +149,8 @@ class PDFExtractor:
         try:
             doc = mupdf.Document(stream=response.content,filetype="pdf")
             # Get Metadata
-            self.date = datetime.strptime(doc.metadata['modDate'][2:16], '%Y%m%d%H%M%S').strftime('%Y-%m-%dT%H:%M:%SZ')
-            self.pdf_dims = f"{round(doc[0].rect.width)}x{round(doc[0].rect.height)}"
-            self.num_pages = len(doc)
-            self.filetype = doc.metadata['format'].split()[0].lower()
-            self.filename = (doc.metadata['title'] if doc.metadata['title'] else datetime.now().strftime('%Y%m%d%H%M%S')+ f".{self.filetype}")
+            self.get_metadata(doc)
+            self.file_size = len(response.content)
         except Exception as e:
             logging.error(f"Error processing PDF: {e}")
             return None
@@ -407,7 +414,11 @@ class PDFExtractor:
         Returns:
             ContentModel: ContentModel object
         """
-        return contentModel(plain=plain, html=html, markdown=markdown)
+        if len(plain) > 1:
+            return contentModel(plain=plain, html=html, markdown=markdown)
+        else:
+            return contentModel(plain=[], html=[], markdown=[])
+
 
 
     def create_attachment_model(self,doc:mupdf.Document,upload_images:bool=False) -> List[attachementModel]:
