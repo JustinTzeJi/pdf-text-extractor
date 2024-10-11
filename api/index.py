@@ -52,6 +52,66 @@ class Response(BaseModel):
 def hello_fast_api():
     return {"message": "Hello from FastAPI"}
 
+@app.post("/api/py/pdf_metadata")
+async def pdf_metadata(request:PDFRequest)->dict:
+    try:
+        # Extract content from the PDF
+        extractor = PDFExtractor()
+        extractor.process_pdf(
+            link = str(request.url), # change url from pydantic object to str since it expects a string
+            get_images=request.get_images,
+        )
+        response = Metadata(
+                    url=str(request.url),
+                    creation_date=extractor.createDate,
+                    modified_date=extractor.modDate,
+                    file_name=extractor.filename,
+                    file_type=extractor.filetype,
+                    file_size=extractor.file_size,
+                    num_pages=extractor.num_pages,
+                )
+        return JSONResponse(
+            status_code=200,
+            content=response.model_dump()
+        )
+
+    except urllib.error.URLError as e:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": {
+                    "code": 400,
+                    "message": f"URL Error: {str(e)}"
+                }
+            }
+        )
+        
+    except HTTPException as e:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": {
+                    "code": 400,
+                    "message": f"Error processing PDF: {str(e.detail)}"
+                }
+            }
+        )
+        
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": {
+                    "code": 500,
+                    "message": f"Error processing PDF: {str(e)}"
+                }
+            }
+        )
+
 @app.post("/api/py/pdf_extract")
 async def extract_pdf(request:PDFRequest)->dict:
     """ API endpoint to extract content from a PDF file
