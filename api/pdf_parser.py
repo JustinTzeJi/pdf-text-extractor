@@ -97,8 +97,8 @@ class PDFExtractor:
         
     def get_metadata(self,doc:mupdf.Document):
         # Get Metadata
-        self.createDate = datetime.strptime(doc.metadata['creationDate'][2:16], '%Y%m%d%H%M%S').strftime('%Y-%m-%dT%H:%M:%SZ')
-        self.modDate = datetime.strptime(doc.metadata['modDate'][2:16], '%Y%m%d%H%M%S').strftime('%Y-%m-%dT%H:%M:%SZ')
+        self.createDate = datetime.strptime(doc.metadata['creationDate'][2:16], '%Y%m%d%H%M%S').strftime('%Y-%m-%dT%H:%M:%SZ') if ('creationDate' in doc.metadata and doc.metadata['creationDate']) else None
+        self.modDate = datetime.strptime(doc.metadata['modDate'][2:16], '%Y%m%d%H%M%S').strftime('%Y-%m-%dT%H:%M:%SZ') if ('modDate' in doc.metadata and doc.metadata['modDate']) else None
         self.pdf_dims = f"{round(doc[0].rect.width)}x{round(doc[0].rect.height)}"
         self.num_pages = len(doc)
         self.filetype = doc.metadata['format'].split()[0].lower()
