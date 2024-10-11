@@ -45,6 +45,15 @@ class Response(BaseModel):
     data : PDFResponse
 
 
+class Metadata_clone(BaseModel):
+    url: str
+    file_name: str
+    file_type: str
+    file_size: Optional[int]
+    num_pages: int
+    creation_date: Optional[str]
+    modified_date: Optional[str]
+
 # API Endpoints
 #================================================================================================
 #================================================================================================
@@ -61,7 +70,7 @@ async def pdf_metadata(request:PDFRequest)->dict:
             link = str(request.url), # change url from pydantic object to str since it expects a string
             get_images=request.get_images,
         )
-        response = Metadata(
+        response = Metadata_clone(
                     url=str(request.url),
                     creation_date=extractor.createDate,
                     modified_date=extractor.modDate,
