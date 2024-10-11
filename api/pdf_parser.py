@@ -13,14 +13,14 @@ import numpy as np
 # import boto3
 import os
 import io
-# import urllib3
+import urllib3
 import logging
 
 # Add the parent directory to sys.path
 import sys
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from markdownify import markdownify as md
 from urllib.parse import urlparse
