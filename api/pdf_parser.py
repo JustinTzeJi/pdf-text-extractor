@@ -132,11 +132,11 @@ class PDFExtractor:
         except Exception as e:
             logging.error(f"Error downloading PDF: {e} \n Writing to problematic_pdf_link.txt")
             ## Write problematic links to a file
-            with open(DIR/"output"/"problematic_links.text","a+") as f:
-                f.seek(0)
-                existing_links = f.read().splitlines()
-                if link not in existing_links:
-                    f.write(link + "\n")
+            # with open(DIR/"output"/"problematic_links.text","a+") as f:
+            #     f.seek(0)
+            #     existing_links = f.read().splitlines()
+            #     if link not in existing_links:
+            #         f.write(link + "\n")
                     
             return None
         else:
