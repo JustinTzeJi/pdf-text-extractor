@@ -26,14 +26,14 @@ class ContentSummary(BaseModel):
 
 class Metadata(BaseModel):
     url: str
-    file_name:str
-    file_type:str
-    file_size:int
-    num_pages:int
-    creation_date:str
-    modified_date:str
-    processing_time:float
-    content_summary:ContentSummary
+    file_name: str
+    file_type: str
+    file_size: int
+    num_pages: int
+    creation_date: Optional[str]
+    modified_date: Optional[str]
+    processing_time: float
+    content_summary: ContentSummary
     
 class PDFResponse(BaseModel):
     metadata: Metadata
