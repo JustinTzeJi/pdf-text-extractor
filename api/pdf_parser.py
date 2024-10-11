@@ -253,7 +253,7 @@ class PDFExtractor:
         for page in doc:
             clip_rect = self.create_clipping_rectangle(page)
             
-            for i,tab in enumerate(page.find_tables()):  # iterate over all tables
+            for i,tab in enumerate(page.find_tables(strategy='lines_strict',snap_tolerance = 2)):  # iterate over all tables
                 page.add_redact_annot(tab.bbox)
             
             page.apply_redactions()  # erase all table text
