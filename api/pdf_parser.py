@@ -21,7 +21,7 @@ import logging
 # import sys
 # sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from markdownify import markdownify as md
 from urllib.parse import urlparse
