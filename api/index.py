@@ -55,6 +55,15 @@ class Metadata_clone(BaseModel):
     modified_date:str
 
 
+class Metadata_clone(BaseModel):
+    url: str
+    file_name: str
+    file_type: str
+    file_size: Optional[int]
+    num_pages: int
+    creation_date: Optional[str]
+    modified_date: Optional[str]
+
 # API Endpoints
 #================================================================================================
 #================================================================================================
@@ -121,7 +130,6 @@ async def pdf_metadata(request:PDFRequest)->dict:
                 }
             }
         )
-    
 
 @app.post("/api/py/pdf_extract")
 async def extract_pdf(request:PDFRequest)->dict:

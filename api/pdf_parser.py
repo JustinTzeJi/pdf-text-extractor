@@ -4,13 +4,14 @@
 
 from datetime import datetime
 import time
+
 import requests
 from pathlib import Path
 import pymupdf as mupdf
 import pymupdf4llm as mupdf4llm
 import urllib
 import numpy as np
-import boto3
+# import boto3
 # import os
 # import io
 # import urllib3
@@ -20,7 +21,7 @@ import logging
 # import sys
 # sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from markdownify import markdownify as md
 from urllib.parse import urlparse
@@ -555,3 +556,4 @@ class PDFExtractor:
 #                 links.append(attachment.get('url'))
     
 #     main(links)
+
