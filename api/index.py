@@ -13,7 +13,7 @@ from typing import List,Optional
 # Initialize the FastAPI app and models
 #================================================================================================
 #================================================================================================
-app = FastAPI()
+app = FastAPI(docs_url="/api/py/docs", openapi_url="/api/py/openapi.json")
 
 class PDFRequest(BaseModel):
     url: HttpUrl
