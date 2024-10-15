@@ -4,6 +4,7 @@
 
 from datetime import datetime
 import time
+
 import requests
 from pathlib import Path
 import pymupdf as mupdf
@@ -11,14 +12,14 @@ import pymupdf4llm as mupdf4llm
 import urllib
 import numpy as np
 # import boto3
-import os
-import io
-import urllib3
+# import os
+# import io
+# import urllib3
 import logging
 
 # Add the parent directory to sys.path
-import sys
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+# import sys
+# sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -28,8 +29,8 @@ from bs4 import BeautifulSoup
 # from tqdm import tqdm
 from typing import List, Tuple
 from dotenv import load_dotenv
-from api.dbutils.scrapping_utils import get_user_agent
-from api.dbutils.data_validation import contentModel, attachementModel
+from dbutils.scrapping_utils import get_user_agent
+from dbutils.data_validation import contentModel, attachementModel
 
 # Set up logging
 #================================================================================================
@@ -51,10 +52,10 @@ load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    # handlers=[
-    #     logging.FileHandler(log_file),
-    #     logging.StreamHandler()
-    # ]
+    handlers=[
+        # logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ]
 )
 
 
@@ -72,7 +73,7 @@ class PDFExtractor:
         self.pdf_dims = None
         self.filetype = None
         self.filename = None
-        self.file_size_mb = None
+        self.file_size = None
         self.num_pages = None
         self.url = None
         self.content_model = None
@@ -85,16 +86,18 @@ class PDFExtractor:
             f"PDFExtractor(\n"
             f"  time_taken: {round(self.time_taken,2)},\n"
             f"  url: {self.url},\n"
-            f"  date: {self.date},\n"
+            f"  creation_date: {self.createDate},\n"
+            f"  modified_date: {self.modDate},\n"
             f"  filename: {self.filename},\n"
             f"  filetype: {urllib.parse.unquote(self.filetype)},\n"
+            f"  file_size: {round(self.file_size,2)} MB,\n"
             f"  pdf_dims: {self.pdf_dims},\n"
             f"  num_pages: {self.num_pages},\n"
             f"  content_model: {self.content_model},\n"
             f"  attachment_model: {self.attachment_model}\n"
             f")"
         )
-        
+    
     def get_metadata(self,doc:mupdf.Document):
         # Get Metadata
         self.createDate = datetime.strptime(doc.metadata['creationDate'][2:16], '%Y%m%d%H%M%S').strftime('%Y-%m-%dT%H:%M:%SZ') if ('creationDate' in doc.metadata and doc.metadata['creationDate']) else None
@@ -103,6 +106,7 @@ class PDFExtractor:
         self.num_pages = len(doc)
         self.filetype = doc.metadata['format'].split()[0].lower()
         self.filename = (doc.metadata['title'] if doc.metadata['title'] else datetime.now().strftime('%Y%m%d%H%M%S')+ f".{self.filetype}")
+        
 
     def get_pdf(self, link: str) -> mupdf.Document:
         """Download PDF from a given URL
@@ -119,10 +123,11 @@ class PDFExtractor:
         
         header = {
             "User-Agent": get_user_agent(),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept": "application/pdf,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
             "Connection": "keep-alive",
             "Referer": f"{parsed_url.scheme}://{parsed_url.netloc}",
+            "Upgrade-Insecure-Requests": "1",
         }
         
         # Try to get response from the URL
@@ -151,6 +156,7 @@ class PDFExtractor:
             # Get Metadata
             self.get_metadata(doc)
             self.file_size = len(response.content)
+            
         except Exception as e:
             logging.error(f"Error processing PDF: {e}")
             return None
@@ -297,7 +303,8 @@ class PDFExtractor:
         >>> print(images[0])
         ("https://s3.amazonaws.com/bucket/image.jpg","image.jpg")
         """
-        
+        image_urls = []
+        image_names = []
         #Image dims check
         dimlimit = 150  # 100  # each image side must be greater than this
         relsize = 0.10  # 0.05  # image : image size ratio must be larger than this (10%)
@@ -330,6 +337,7 @@ class PDFExtractor:
             Returns:
                 image_data (Dict): Image data
             """
+            
             xref = item[0]  # xref of PDF image
             smask = item[1]  # xref of its /SMask
 
@@ -368,11 +376,7 @@ class PDFExtractor:
                 }
                 
             return doc.extract_image(xref)
-        
-        image_urls = []
-        image_names = []
-        
-        
+                
         for i, page in enumerate(doc):
             img_list = doc.get_page_images(i)
             # xrefs = [x[0] for x in img_list]
@@ -418,7 +422,6 @@ class PDFExtractor:
             return contentModel(plain=plain, html=html, markdown=markdown)
         else:
             return contentModel(plain=[], html=[], markdown=[])
-
 
 
     def create_attachment_model(self,doc:mupdf.Document,upload_images:bool=False) -> List[attachementModel]:
@@ -526,9 +529,31 @@ class PDFExtractor:
 # #================================================================================================
 
 # def main(links: List[str]):
-#     for link in tqdm(links,desc="Processing PDFs",unit="pdf",total=len(links)):
-#         extractor = PDFExtractor()
-#         content_model,attachment_model = extractor.process_pdf(link,get_images=False)
-#         extractor.write_to_files()
-#         print("Time Taken: ",extractor.time_taken)
-#         # print(attachment_model)
+#     link = "https://ekonomi.gov.my/sites/default/files/2023-05/Speech_Affin-Conference_30May2023.pdf"
+#     extractor = PDFExtractor()
+#     content_model,attachment_model = extractor.process_pdf(link,get_images=False)
+#     extractor.write_to_files()
+#     print("Time Taken: ",extractor.time_taken)
+#     print(extractor.__repr__())
+
+# if __name__ == "__main__":
+#     from pymongo import MongoClient
+    
+#     links = []
+
+#     client = MongoClient(os.getenv("DATABASE_URI"))
+#     db = client[os.getenv("DB_NAME")]
+#     collection = db[os.getenv("COLLECTION_NAME")]
+
+#     pipeline = [
+#         {"$match": {"attachments.file_type": "pdf"}},
+#         {"$sample": {"size": 5}}
+#     ]
+#     random_entries = list(collection.aggregate(pipeline))
+#     for entry in random_entries:
+#         for attachment in entry.get('attachments', []):
+#             if attachment.get('file_type') == 'pdf':
+#                 links.append(attachment.get('url'))
+    
+#     main(links)
+

@@ -2,18 +2,19 @@
 #================================================================================================
 #================================================================================================
 import urllib
-from api.dbutils.data_validation import contentModel, attachementModel
+from dbutils.data_validation import contentModel, attachementModel
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel,HttpUrl
-from api.pdf_parser import PDFExtractor
+from pdf_parser import PDFExtractor
 from typing import List,Optional
 
 
 # Initialize the FastAPI app and models
 #================================================================================================
 #================================================================================================
-app = FastAPI(docs_url="/api/py/docs", openapi_url="/api/py/openapi.json")
+app = FastAPI()
+
 class PDFRequest(BaseModel):
     url: HttpUrl
     get_images: bool = False
@@ -26,14 +27,14 @@ class ContentSummary(BaseModel):
 
 class Metadata(BaseModel):
     url: str
-    file_name: str
-    file_type: str
-    file_size: int
-    num_pages: int
-    creation_date: Optional[str]
-    modified_date: Optional[str]
-    processing_time: float
-    content_summary: ContentSummary
+    file_name:str
+    file_type:str
+    file_size:int
+    num_pages:int
+    creation_date:Optional[str]
+    modified_date:Optional[str]
+    processing_time:float
+    content_summary:ContentSummary
     
 class PDFResponse(BaseModel):
     metadata: Metadata
@@ -43,6 +44,15 @@ class PDFResponse(BaseModel):
 class Response(BaseModel):
     success: bool
     data : PDFResponse
+
+class Metadata_clone(BaseModel):
+    url: str
+    file_name:str
+    file_type:str
+    file_size:int
+    num_pages:int
+    creation_date:str
+    modified_date:str
 
 
 class Metadata_clone(BaseModel):
@@ -160,7 +170,7 @@ async def extract_pdf(request:PDFRequest)->dict:
                     file_type=extractor.filetype,
                     file_size=extractor.file_size,
                     num_pages=extractor.num_pages,
-                    processing_time=round(extractor.time_taken,3),\
+                    processing_time=round(extractor.time_taken,3),
                     content_summary=ContentSummary(
                         plain_text_length=len(content_model.plain),
                         html_length=len(content_model.html),
@@ -215,3 +225,7 @@ async def extract_pdf(request:PDFRequest)->dict:
                 }
             }
         )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)
