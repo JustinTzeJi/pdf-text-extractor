@@ -29,8 +29,8 @@ from bs4 import BeautifulSoup
 # from tqdm import tqdm
 from typing import List, Tuple
 from dotenv import load_dotenv
-from dbutils.scrapping_utils import get_user_agent
-from dbutils.data_validation import contentModel, attachementModel
+from api.dbutils.scrapping_utils import get_user_agent
+from api.dbutils.data_validation import contentModel, attachementModel
 
 # Set up logging
 #================================================================================================
