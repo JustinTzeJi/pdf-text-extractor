@@ -2,11 +2,11 @@
 #================================================================================================
 #================================================================================================
 import urllib
-from dbutils.data_validation import contentModel, attachementModel
+from api.dbutils.data_validation import contentModel, attachementModel
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel,HttpUrl
-from pdf_parser import PDFExtractor
+from api.pdf_parser import PDFExtractor
 from typing import List,Optional
 
 
