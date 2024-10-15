@@ -21,7 +21,7 @@ import logging
 # import sys
 # sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from markdownify import markdownify as md
 from urllib.parse import urlparse
@@ -29,8 +29,8 @@ from bs4 import BeautifulSoup
 # from tqdm import tqdm
 from typing import List, Tuple
 from dotenv import load_dotenv
-from dbutils.scrapping_utils import get_user_agent
-from dbutils.data_validation import contentModel, attachementModel
+from api.dbutils.scrapping_utils import get_user_agent
+from api.dbutils.data_validation import contentModel, attachementModel
 
 # Set up logging
 #================================================================================================
