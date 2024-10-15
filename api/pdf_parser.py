@@ -10,15 +10,15 @@ import pymupdf as mupdf
 import pymupdf4llm as mupdf4llm
 import urllib
 import numpy as np
-# import boto3
-import os
-import io
+import boto3
+# import os
+# import io
 # import urllib3
 import logging
 
 # Add the parent directory to sys.path
-import sys
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+# import sys
+# sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 # urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -28,8 +28,8 @@ from bs4 import BeautifulSoup
 # from tqdm import tqdm
 from typing import List, Tuple
 from dotenv import load_dotenv
-from api.dbutils.scrapping_utils import get_user_agent
-from api.dbutils.data_validation import contentModel, attachementModel
+from dbutils.scrapping_utils import get_user_agent
+from dbutils.data_validation import contentModel, attachementModel
 
 # Set up logging
 #================================================================================================
@@ -51,10 +51,10 @@ load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    # handlers=[
-    #     logging.FileHandler(log_file),
-    #     logging.StreamHandler()
-    # ]
+    handlers=[
+        # logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ]
 )
 
 
