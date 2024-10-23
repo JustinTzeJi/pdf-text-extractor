@@ -2,7 +2,7 @@
 #================================================================================================
 #================================================================================================
 
-from datetime import datetime
+from datetime import datetime,timedelta,timezone
 import time
 
 import requests
@@ -99,9 +99,19 @@ class PDFExtractor:
         )
     
     def get_metadata(self,doc:mupdf.Document):
+        
+        def date_parser(date:str)->str:
+            formats = ['%Y%m%d%H%M%S', '%d/%m/%y %H:%M']
+            for fmt in formats:
+                try:
+                    return datetime.strptime(date, fmt).strftime('%Y-%m-%dT%H:%M:%SZ')
+                except ValueError:
+                    continue
+            return None
+            
         # Get Metadata
-        self.createDate = datetime.strptime(doc.metadata['creationDate'][2:16], '%Y%m%d%H%M%S').strftime('%Y-%m-%dT%H:%M:%SZ') if ('creationDate' in doc.metadata and doc.metadata['creationDate']) else None
-        self.modDate = datetime.strptime(doc.metadata['modDate'][2:16], '%Y%m%d%H%M%S').strftime('%Y-%m-%dT%H:%M:%SZ') if ('modDate' in doc.metadata and doc.metadata['modDate']) else None
+        self.createDate = date_parser(doc.metadata['creationDate'][2:16]) if ('creationDate' in doc.metadata and doc.metadata['creationDate']) else None
+        self.modDate = date_parser(doc.metadata['modDate'][2:16]) if ('modDate' in doc.metadata and doc.metadata['modDate']) else None
         self.pdf_dims = f"{round(doc[0].rect.width)}x{round(doc[0].rect.height)}"
         self.num_pages = len(doc)
         self.filetype = doc.metadata['format'].split()[0].lower()
