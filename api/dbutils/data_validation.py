@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 class contentModel(BaseModel):
     plain: Optional[list]
-    html: Optional[list]
     markdown: Optional[list]
 
 
