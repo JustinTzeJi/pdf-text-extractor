@@ -261,10 +261,10 @@ class PDFExtractor:
         >>> print(markdown[0])  # First line of markdown from the first page
         "# This is the first line of the first page of the PDF"
         """
-        plain, html, markdown = [], [], []
+        plain, markdown = [], []
         
         if doc is None:
-            return plain, html, markdown
+            return plain, markdown
 
         for page in doc:
             clip_rect = self.create_clipping_rectangle(page)
@@ -278,13 +278,13 @@ class PDFExtractor:
             page_text = page.get_text(clip=clip_rect).splitlines()
             plain.append([line.strip() for line in page_text if line.strip()])
 
-            # Extract HTML and split into lines, filter out image tags
-            html_text = page.get_text('html', clip=clip_rect).splitlines()
-            soup = BeautifulSoup("\n".join(html_text), 'html.parser')
-            # Get rid of images in the HTML
-            for img in soup.find_all('img'):
-                img.decompose()
-            html.append([line.strip() for line in soup.prettify().splitlines() if line.strip()])
+            # # Extract HTML and split into lines, filter out image tags
+            # html_text = page.get_text('html', clip=clip_rect).splitlines()
+            # soup = BeautifulSoup("\n".join(html_text), 'html.parser')
+            # # Get rid of images in the HTML
+            # for img in soup.find_all('img'):
+            #     img.decompose()
+            # html.append([line.strip() for line in soup.prettify().splitlines() if line.strip()])
 
         # Extract markdown
         markdown_text = mupdf4llm.to_markdown(doc, show_progress=False,write_images=False,table_strategy="lines_strict",margins=(70,70))
@@ -292,10 +292,9 @@ class PDFExtractor:
         
         #Flatten the lists
         plain = [line for page in plain for line in page]
-        html = [line for page in html for line in page]
         markdown = [line for page in markdown for line in page]
 
-        return plain, html, markdown
+        return plain, markdown
     
     
     def extract_images_with_clipping(self,doc:mupdf.Document,upload:bool=False) -> List[Tuple[str,str]]:
@@ -417,7 +416,7 @@ class PDFExtractor:
         return zip(image_urls,image_names)
 
 
-    def create_content_model(self, plain: List[str], html: List[str], markdown: List[str]) -> contentModel:
+    def create_content_model(self, plain: List[str], markdown: List[str]) -> contentModel:
         """Create a ContentModel object to be used with SiaranModel
 
         Args:
@@ -429,9 +428,9 @@ class PDFExtractor:
             ContentModel: ContentModel object
         """
         if len(plain) > 1:
-            return contentModel(plain=plain, html=html, markdown=markdown)
+            return contentModel(plain=plain,markdown=markdown)
         else:
-            return contentModel(plain=[], html=[], markdown=[])
+            return contentModel(plain=[], markdown=[])
 
 
     def create_attachment_model(self,doc:mupdf.Document,upload_images:bool=False) -> List[attachementModel]:
@@ -494,7 +493,6 @@ class PDFExtractor:
         
         file_contents = {
             f"{self.filename.split('.')[0]}_plain.txt": "\n".join(self.content_model.plain),
-            f"{self.filename.split('.')[0]}_html.html": "\n".join(self.content_model.html),
             f"{self.filename.split('.')[0]}_markdown.md": "\n".join(self.content_model.markdown)
         }
 
@@ -518,9 +516,9 @@ class PDFExtractor:
         doc = self.get_pdf(link)
         
         start_time = time.time()
-        plain, html, markdown = self.extract_text_with_clipping(doc)
+        plain, markdown = self.extract_text_with_clipping(doc)
         # self.write_to_files(plain, html, markdown)
-        self.content_model = self.create_content_model(plain, html, markdown)
+        self.content_model = self.create_content_model(plain,markdown)
         
         if get_images:
             self.attachment_model = self.create_attachment_model(doc, upload_images=True)
