@@ -21,7 +21,6 @@ class PDFRequest(BaseModel):
 
 class ContentSummary(BaseModel):
     plain_text_length: int
-    html_length: int
     markdown_length: int
     num_attachments: int
 
@@ -173,7 +172,6 @@ async def extract_pdf(request:PDFRequest)->dict:
                     processing_time=round(extractor.time_taken,3),
                     content_summary=ContentSummary(
                         plain_text_length=len(content_model.plain),
-                        html_length=len(content_model.html),
                         markdown_length=len(content_model.markdown),
                         num_attachments=len(attachment_model) if attachment_model else 0
                     )
