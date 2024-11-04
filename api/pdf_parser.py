@@ -16,6 +16,7 @@ import numpy as np
 # import io
 # import urllib3
 import logging
+import re
 
 # Add the parent directory to sys.path
 # import sys
@@ -261,18 +262,24 @@ class PDFExtractor:
         >>> print(markdown[0])  # First line of markdown from the first page
         "# This is the first line of the first page of the PDF"
         """
-        plain, markdown = [], []
+        plain, markdown , markdown_text = [], [] , []
         
         if doc is None:
             return plain, markdown
 
-        for page in doc:
+        for page_num,page in enumerate(doc):
             clip_rect = self.create_clipping_rectangle(page)
             
-            for i,tab in enumerate(page.find_tables(strategy='lines_strict')):  # iterate over all tables
-                page.add_redact_annot(tab.bbox)
+            bottom = page.rect.height - clip_rect.y1
+            top = clip_rect.y0 + clip_rect.y0 * 0.25 # add some margin to the top
+            page_md = mupdf4llm.to_markdown(doc, pages = [page_num], show_progress=False,write_images=False,table_strategy="lines_strict",margins=(top,bottom))
+            markdown_text.append(page_md)
             
-            page.apply_redactions()  # erase all table text
+            
+            # for i,tab in enumerate(page.find_tables(strategy='lines_strict')):  # iterate over all tables
+            #     page.add_redact_annot(tab.bbox)
+            
+            # page.apply_redactions()  # erase all table text
             
             # Extract plain text and split into lines
             page_text = page.get_text(clip=clip_rect).splitlines()
@@ -287,12 +294,11 @@ class PDFExtractor:
             # html.append([line.strip() for line in soup.prettify().splitlines() if line.strip()])
 
         # Extract markdown
-        markdown_text = mupdf4llm.to_markdown(doc, show_progress=False,write_images=False,table_strategy="lines_strict",margins=(70,70))
-        markdown = [page.splitlines() for page in markdown_text.split('\f') if page.strip()]
+        markdown = [re.sub(r'\n{2,}','\n',text).replace('-----\n','') for text in markdown_text if text.strip()]
+        markdown = [''.join(text) for text in markdown]
         
         #Flatten the lists
         plain = [line for page in plain for line in page]
-        markdown = [line for page in markdown for line in page]
 
         return plain, markdown
     
@@ -546,7 +552,8 @@ class PDFExtractor:
 
 # if __name__ == "__main__":
 #     from pymongo import MongoClient
-    
+#     import os
+
 #     links = []
 
 #     client = MongoClient(os.getenv("DATABASE_URI"))
