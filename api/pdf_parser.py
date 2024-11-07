@@ -20,7 +20,7 @@ import re
 
 from scipy.ndimage import binary_dilation, binary_erosion, gaussian_filter
 from urllib.parse import urlparse
-from typing import List, Tuple
+from typing import List, Tuple,Union
 from dotenv import load_dotenv
 from api.dbutils.scrapping_utils import get_user_agent
 from api.dbutils.data_validation import contentModel, attachementModel
@@ -587,124 +587,124 @@ class PDFExtractor:
         markdown,plain = self.convert_to_markdown(text_blocks)
         return plain,markdown
     
+    #! Deprecated
+    # def extract_images_with_clipping(self,doc:mupdf.Document,upload:bool=False) -> List[Tuple[str,str]]:
+    #     """Extract images from a PDF with clipping, returning a list of image URLs and names.
 
-    def extract_images_with_clipping(self,doc:mupdf.Document,upload:bool=False) -> List[Tuple[str,str]]:
-        """Extract images from a PDF with clipping, returning a list of image URLs and names.
+    #     Args:
+    #         doc (mupdf.Document): PDF document object
+    #         upload (bool, optional): Upload images to S3. Defaults to False.
 
-        Args:
-            doc (mupdf.Document): PDF document object
-            upload (bool, optional): Upload images to S3. Defaults to False.
-
-        Returns:
-            List[Tuple[str,str]]: List of tuples containing image URLs and names
+    #     Returns:
+    #         List[Tuple[str,str]]: List of tuples containing image URLs and names
         
-        Example usage:
-        >>> images = extract_images_with_clipping(doc)
-        >>> print(images[0])
-        ("https://s3.amazonaws.com/bucket/image.jpg","image.jpg")
-        """
-        # Initialize lists
-        image_urls = []
-        image_names = []
+    #     Example usage:
+    #     >>> images = extract_images_with_clipping(doc)
+    #     >>> print(images[0])
+    #     ("https://s3.amazonaws.com/bucket/image.jpg","image.jpg")
+    #     """
+    #     # Initialize lists
+    #     image_urls = []
+    #     image_names = []
         
-        #Image dims check
-        dimlimit = 150  # 100  # each image side must be greater than this
-        relsize = 0.10  # 0.05  # image : image size ratio must be larger than this (10%)
+    #     #Image dims check
+    #     dimlimit = 150  # 100  # each image side must be greater than this
+    #     relsize = 0.10  # 0.05  # image : image size ratio must be larger than this (10%)
         
-        # Helper functions
-        @staticmethod
-        def upload_to_bucket(file_name:str, file_data:object,upload:bool=upload):
-            s3 = boto3.client(
-                service_name="s3",
-                endpoint_url=os.getenv("ENDPOINT_URL"),
-                aws_access_key_id=os.getenv("AWS_KEY"),
-                aws_secret_access_key=os.getenv("AWS_SECRET"),
-                region_name="auto",
-            )
+    #     # Helper functions
+    #     @staticmethod
+    #     def upload_to_bucket(file_name:str, file_data:object,upload:bool=upload):
+    #         s3 = boto3.client(
+    #             service_name="s3",
+    #             endpoint_url=os.getenv("ENDPOINT_URL"),
+    #             aws_access_key_id=os.getenv("AWS_KEY"),
+    #             aws_secret_access_key=os.getenv("AWS_SECRET"),
+    #             region_name="auto",
+    #         )
             
-            # Upload/Update single file
-            if upload:
-                s3.upload_fileobj(file_data, "siaran-temp", file_name)
+    #         # Upload/Update single file
+    #         if upload:
+    #             s3.upload_fileobj(file_data, "siaran-temp", file_name)
             
-            return f"{os.getenv("S3_URL")}{file_name}"
+    #         return f"{os.getenv("S3_URL")}{file_name}"
         
-        @staticmethod
-        def recoverpix(doc:mupdf.Document, item:List)->dict:
-            """Recover image data from a PDF document.Will also handle images with transparent backgrounds.
+    #     @staticmethod
+    #     def recoverpix(doc:mupdf.Document, item:List)->dict:
+    #         """Recover image data from a PDF document.Will also handle images with transparent backgrounds.
 
-            Args:
-                doc (mupdf.Document): PDF document object
-                item (List): List of image data
+    #         Args:
+    #             doc (mupdf.Document): PDF document object
+    #             item (List): List of image data
 
-            Returns:
-                image_data (Dict): Image data
-            """
+    #         Returns:
+    #             image_data (Dict): Image data
+    #         """
             
-            xref = item[0]  # xref of PDF image
-            smask = item[1]  # xref of its /SMask
+    #         xref = item[0]  # xref of PDF image
+    #         smask = item[1]  # xref of its /SMask
 
-            # special case: /SMask or /Mask exists
-            if smask > 0:
-                pix0 = mupdf.Pixmap(doc.extract_image(xref)["image"])
-                if pix0.alpha:  # catch irregular situation
-                    pix0 = mupdf.Pixmap(pix0, 0)  # remove alpha channel
-                mask = mupdf.Pixmap(doc.extract_image(smask)["image"])
+    #         # special case: /SMask or /Mask exists
+    #         if smask > 0:
+    #             pix0 = mupdf.Pixmap(doc.extract_image(xref)["image"])
+    #             if pix0.alpha:  # catch irregular situation
+    #                 pix0 = mupdf.Pixmap(pix0, 0)  # remove alpha channel
+    #             mask = mupdf.Pixmap(doc.extract_image(smask)["image"])
 
-                try:
-                    pix = mupdf.Pixmap(pix0, mask)
-                except:  # fallback to original base image in case of problems
-                    pix = mupdf.Pixmap(doc.extract_image(xref)["image"])
+    #             try:
+    #                 pix = mupdf.Pixmap(pix0, mask)
+    #             except:  # fallback to original base image in case of problems
+    #                 pix = mupdf.Pixmap(doc.extract_image(xref)["image"])
 
-                if pix0.n > 3:
-                    ext = "pam"
-                else:
-                    ext = "png"
+    #             if pix0.n > 3:
+    #                 ext = "pam"
+    #             else:
+    #                 ext = "png"
 
-                return {  # create dictionary expected by caller
-                    "ext": ext,
-                    "colorspace": pix.colorspace.n,
-                    "image": pix.tobytes(ext),
-                }
+    #             return {  # create dictionary expected by caller
+    #                 "ext": ext,
+    #                 "colorspace": pix.colorspace.n,
+    #                 "image": pix.tobytes(ext),
+    #             }
 
-            # special case: /ColorSpace definition exists
-            # to be sure, we convert these cases to RGB PNG images
-            if "/ColorSpace" in doc.xref_object(xref, compressed=True):
-                pix = mupdf.Pixmap(doc, xref)
-                pix = mupdf.Pixmap(mupdf.csRGB, pix)
-                return {  # create dictionary expected by caller
-                    "ext": "png",
-                    "colorspace": 3,
-                    "image": pix.tobytes("png"),
-                }
+    #         # special case: /ColorSpace definition exists
+    #         # to be sure, we convert these cases to RGB PNG images
+    #         if "/ColorSpace" in doc.xref_object(xref, compressed=True):
+    #             pix = mupdf.Pixmap(doc, xref)
+    #             pix = mupdf.Pixmap(mupdf.csRGB, pix)
+    #             return {  # create dictionary expected by caller
+    #                 "ext": "png",
+    #                 "colorspace": 3,
+    #                 "image": pix.tobytes("png"),
+    #             }
                 
-            return doc.extract_image(xref)
+    #         return doc.extract_image(xref)
                 
-        for i, page in enumerate(doc):
-            img_list = doc.get_page_images(i)
-            # xrefs = [x[0] for x in img_list]
+    #     for i, page in enumerate(doc):
+    #         img_list = doc.get_page_images(i)
+    #         # xrefs = [x[0] for x in img_list]
             
-            for img in img_list:
+    #         for img in img_list:
                 
-                width = img[2]
-                height = img[3]
-                if min(width, height) <= dimlimit:
-                    continue
+    #             width = img[2]
+    #             height = img[3]
+    #             if min(width, height) <= dimlimit:
+    #                 continue
                 
-                image = recoverpix(doc, img)
-                imgdata = image["image"]
+    #             image = recoverpix(doc, img)
+    #             imgdata = image["image"]
                 
-                if len(imgdata) / (width * height * image['colorspace']) <= relsize:
-                        continue
+    #             if len(imgdata) / (width * height * image['colorspace']) <= relsize:
+    #                     continue
                 
-                img_name = f"{self.filename.split('.')[0]}_img_{i}.png"
-                image_names.append(img_name)
+    #             img_name = f"{self.filename.split('.')[0]}_img_{i}.png"
+    #             image_names.append(img_name)
                 
-                # Upload image data directly to S3
-                with io.BytesIO(imgdata) as img_buffer:
-                    image_urls.append(upload_to_bucket(img_name, img_buffer))
+    #             # Upload image data directly to S3
+    #             with io.BytesIO(imgdata) as img_buffer:
+    #                 image_urls.append(upload_to_bucket(img_name, img_buffer))
                     
-                with open(self.input_path / img_name, "wb") as f:
-                    f.write(imgdata)
+    #             with open(self.input_path / img_name, "wb") as f:
+    #                 f.write(imgdata)
             
         return zip(image_urls,image_names)
 
