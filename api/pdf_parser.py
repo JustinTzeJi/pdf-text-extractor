@@ -18,17 +18,9 @@ import numpy as np
 import logging
 import re
 
-# Add the parent directory to sys.path
-# import sys
-# sys.path.append(str(Path(__file__).resolve().parent.parent))
-
-# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-from markdownify import markdownify as md
+from scipy.ndimage import binary_dilation, binary_erosion, gaussian_filter
 from urllib.parse import urlparse
-from bs4 import BeautifulSoup
-# from tqdm import tqdm
-from typing import List, Tuple
+from typing import List, Tuple,Union
 from dotenv import load_dotenv
 from api.dbutils.scrapping_utils import get_user_agent
 from api.dbutils.data_validation import contentModel, attachementModel
@@ -63,7 +55,9 @@ logging.basicConfig(
 # PDFExtractor class
 #================================================================================================
 #================================================================================================
-
+# PDFExtractor class
+#================================================================================================
+#================================================================================================
 class PDFExtractor:
     """Class to extract text and images from a PDF
     """
@@ -117,6 +111,35 @@ class PDFExtractor:
         self.num_pages = len(doc)
         self.filetype = doc.metadata['format'].split()[0].lower()
         self.filename = (doc.metadata['title'] if doc.metadata['title'] else datetime.now().strftime('%Y%m%d%H%M%S')+ f".{self.filetype}")
+
+
+    # def _show_image(self,page, title="",grayscale=False):
+    #     """Display a pixmap.
+
+    #     Just to display Pixmap image of "item" - ignore the man behind the curtain.
+
+    #     Args:
+    #         item: any PyMuPDF object having a "get_pixmap" method.
+    #         title: a string to be used as image title
+
+    #     Generates an RGB Pixmap from item using a constant DPI and using matplotlib
+    #     to show it inline of the notebook.
+    #     """
+    #     DPI = 150  # use this resolution
+    #     import numpy as np
+
+    #     # %matplotlib inline
+    #     pix = page.get_pixmap(dpi=DPI)
+    #     img = np.ndarray([pix.h, pix.w, 3], dtype=np.uint8, buffer=pix.samples_mv)
+    #     plt.figure(dpi=DPI)  # set the figure's DPI
+    #     plt.title(title)  # set title of image
+    #     if grayscale:
+    #         img = np.dot(img[...,:3], [0.2989, 0.5870, 0.1140])
+    #         plt.imshow(img,cmap='gray', extent=(0, pix.w * 72 / DPI, pix.h * 72 / DPI, 0))
+    #     else:
+    #         plt.imshow(img, extent=(0, pix.w * 72 / DPI, pix.h * 72 / DPI, 0))
+        
+    #     plt.show()
         
 
     def get_pdf(self, link: str) -> mupdf.Document:
@@ -175,75 +198,324 @@ class PDFExtractor:
             logging.info(f"Successfully downloaded PDF: {self.filename}")
             return doc
     
-    
-    def create_clipping_rectangle(self,page: mupdf.Page) -> mupdf.Rect:
-        """Create a clipping rectangle for a given page, made using vectorization for speed.
+    def _create_clipping_rectangle(
+            self, 
+            page: mupdf.Page,
+            content_threshold:float = 0.08,
+            color_threshold:float = 0.15,
+            std_threshold:float = 0.1,
+            margin_ratio:float = 0.08,
+            color_row_threshold:float = 0.15,
+            window_detection_size: Union[int, Tuple[int, int]] = (20, 20)
+    ) -> mupdf.Rect:
+        """Create a clipping rectangle for a given page using enhanced image processing.
+        
+        The function processes the image to enhance text-like features and detect colored
+        regions that might indicate headers and footers, even if not fully colored.
 
         Args:
-            page (mupdf.Page): Page object from PyMuPDF
-
+            page (mupdf.Page): Page object
+            content_threshold (float, optional): Threshold for content detection. Defaults to 0.08.
+            color_threshold (float, optional): Threshold for color detection. Defaults to 0.15.
+            std_threshold (float, optional): Threshold for standard deviation detection. Defaults to 0.1.
+            margin_ratio (float, optional): Ratio of the margin to the height of the page. Defaults to 0.08.
+            color_row_threshold (float, optional): Threshold for colored row detection. Defaults to 0.15.
+            window_detection_size (Union[int, Tuple[int, int]], optional): Size of the window for detection. Defaults to (20, 20).
+        
         Returns:
             mupdf.Rect: Clipping rectangle
-            
-        Examples:
-            >>> create_clipping_rectangle(page)
-            mupdf.Rect(0, 0, 595.32, 841.92)
         """
-        # Convert the page to an image object
+        # Convert the page to an image array
         pix = page.get_pixmap()
-        
-        #Change the image to numpy array immediately rather than converting to PIL image
         img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, 3)
+        height, width = img_array.shape[0], img_array.shape[1]
         
-        # Convert to grayscale
-        #Values are weighted to account for human perception of color
-        # Retunrs a 2D array of the image in grayscale
+        # Set the parameters
+        content_threshold = content_threshold
+        color_threshold = color_threshold
+        margin = int(height * margin_ratio)
+        color_row_threshold = color_row_threshold
+        
+        # Set the window detection size
+        if isinstance(window_detection_size, int):
+            window_detection_size = (window_detection_size, window_detection_size)
+        
+        def _detect_colored_regions(img_array: np.ndarray) -> np.ndarray:
+            """Detect colored regions in the image.
+            Calculate the saturation and standard deviation of the RGB channels to detect colored regions
+
+            Args:
+                img_array (np.ndarray): Image array
+
+            Returns:
+                np.ndarray: Array of colored rows
+            """
+            img_normalized = img_array.astype(float) / 255.0
+            max_rgb = np.max(img_normalized, axis=2)
+            min_rgb = np.min(img_normalized, axis=2)
+            eps = 1e-8
+            saturation = np.divide(
+                max_rgb - min_rgb, 
+                max_rgb + eps, 
+                out=np.zeros_like(max_rgb), 
+                where=max_rgb != 0
+            )
+            rgb_std = np.std(img_normalized, axis=2)
+            is_colored = (saturation > color_threshold) | (rgb_std > std_threshold)
+            colored_rows = np.mean(is_colored, axis=1)
+            return colored_rows
+        
+        def _enhance_text_regions(img_array: np.ndarray) -> np.ndarray:
+            """Enhance text regions in the img_array.
+            Use kernel-based dilation to expand text regions and smooth the result with a Gaussian filter.
+
+            Args:
+                img_array (np.ndarray): img_array array
+
+            Returns:
+                normalized (np.ndarray): Normalized img_array array
+            """
+            binary = img_array < 248
+            horizontal_kernel = np.ones((1, 5))
+            dilated_horizontal = binary_dilation(binary, horizontal_kernel)
+            vertical_kernel = np.ones((3, 1))
+            dilated = binary_dilation(dilated_horizontal, vertical_kernel)
+            smoothed = gaussian_filter(dilated.astype(float), sigma=1)
+            normalized = (smoothed - smoothed.min()) / (smoothed.max() - smoothed.min())
+            return normalized
+        
+        # 1. Convert the image to grayscale
         img_gray = np.dot(img_array[..., :3], [0.2989, 0.5870, 0.1140])
         
-        # Get image dimensions
-        height, width = img_gray.shape
+        # 2. Enhance text regions and detect colored regions
+        enhanced_img = _enhance_text_regions(img_gray)
+        colored_rows = _detect_colored_regions(img_array)
         
-        # Define thresholds
-        color_threshold = 250 # Higher values are closer to white
-        content_threshold = 0.10 # More than 20% non-white pixels to be considered content
-        margin = int(height * 0.08) # 8% of page height as margin
+        # 3. Detect content and colored regions
+        ## Detect content regions
+        row_content = np.mean(enhanced_img > 0.5, axis=1) >= content_threshold
+        ## Detect colored regions
+        colored_regions = colored_rows >= color_row_threshold
+        ## Expand and smooth the colored regions
+        colored_regions = binary_dilation(colored_regions, np.ones(5))
+        colored_regions = binary_erosion(colored_regions, np.ones(3))
         
-        # Vectorized row content check
-        # Check if the mean of the row is less than the color threshold
-        # If the mean is greater than the content threshold, the row is considered content
-        # This is like a for loop but much faster,it checks all elements in the row at once
-        row_content = np.mean(img_gray < color_threshold, axis=1) > content_threshold
-        # print(row_content)
+        # 5. Detect the start and end of the content region
+        start_y = margin
+        while start_y < height - margin:
+            window_size = window_detection_size[0]
+            window_end = min(start_y + window_size, height)
+            # Check if the window contains colored regions or only content
+            if np.any(colored_regions[start_y:window_end]) or np.all(row_content[start_y:window_end]):
+                start_y += int(height * 0.08)
+            else:
+                break
         
-        # Vectorized fully colored check
-        # Check if the mean of the row is equal to 1.0
-        # If the mean is 1.0, the row is fully colored
-        # This is like a for loop but much faster,it checks all elements in the row at once
-        fully_colored = np.mean(img_gray < color_threshold, axis=1) == 1.0
+        ## Set end_y to the bottom of the page by a margin
+        end_y = height - margin
+        while end_y > start_y:
+            window_size = window_detection_size[-1]
+            window_start = max(end_y - window_size, 0)
+            # Check if the window contains colored regions or only content
+            if np.any(colored_regions[window_start:end_y]) or np.all(row_content[window_start:end_y]):
+                end_y -= int(height * 0.15)
+            else:
+                break
         
-        # Check for fully colored section and adjust start_y if found
-        # margin refers to position of the top margin
-        # checks if the position of the top margin is fully colored by checking if any row in the fully_colored array is True
-        if np.any(fully_colored[margin]):
-            start_y = int(height * 0.20) # Increase margin to 10% if fully colored section is detected
-        else:
-            start_y = margin
+        # 6. Find the start and end of the content region
+        content_start = np.argmax(row_content[start_y:end_y]) + start_y if np.any(row_content[start_y:end_y]) else start_y
+        pad_end_y = round(end_y * 0.08)
+        content_slice = row_content[content_start:end_y - pad_end_y]
+        content_end = end_y - np.argmax(content_slice[::-1]) if np.any(content_slice) else end_y
         
-        # Find the first content row after the top margin
-        start_y = np.argmax(row_content[start_y:]) + start_y
+        # 7. Create the clipping rectangle
+        safety_margin = int(height * 0.025)
+        final_start = max(0, content_start - safety_margin)
+        final_end = min(height, content_end + safety_margin)
         
-        # Find the last content row before the bottom margin
-        end_y = height - margin - np.argmax(row_content[start_y:height-margin][::-1]) - 5
-        
-        # Add safety margin
-        safety_margin = 37
-        start_y = max(0, start_y - safety_margin)
-        end_y = min(height, end_y + safety_margin)
-        
-        # Create and return the clipping rectangle
-        return mupdf.Rect(0, start_y, width, end_y)
+        return mupdf.Rect(0, final_start, width, final_end)
     
+    def _process_rects(
+            self,
+            rects: List[mupdf.Rect],
+            expansion_percent: float = 10,
+            threshold: float = 5,
+            x_tolerance: float = 2
+        ) -> List[mupdf.Rect]:
+        """Process and merge rectangles that are close to each other.
+        
+        Args:
+            rects (List[mupdf.Rect]): List of rectangles to process
+            expansion_percent (float, optional): Percentage to expand rectangles. Defaults to 10.
+            threshold (float, optional): Distance threshold for merging. Defaults to 5.
+            x_tolerance (float, optional): X-coordinate tolerance. Defaults to 2.
+
+        Returns:
+            List[mupdf.Rect]: List of processed rectangles
+        """
+        if not rects:
+            return []
+        
+        # 1. Expand rectangles vertically
+        expanded_rects = []
+        for rect in rects:
+            try:
+                height = rect.height
+                expansion = height * (expansion_percent / 100)
+                new_rect = mupdf.Rect(
+                    rect.x0,
+                    rect.y0 - expansion/2,
+                    rect.x1,
+                    rect.y1 + expansion/2
+                )
+                expanded_rects.append(new_rect)
+            except Exception as e:
+                logging.error(f"Error processing rectangle: {e}")
+                continue
+        
+        # 2. First pass: merge intersecting rectangles
+        merged_initial = []
+        rects_to_process = expanded_rects.copy()
+        
+        while rects_to_process:
+            current = rects_to_process.pop(0)
+            merged = False
+            
+            i = 0
+            while i < len(rects_to_process):
+                if current.intersects(rects_to_process[i]):
+                    current = mupdf.Rect(
+                        min(current.x0, rects_to_process[i].x0),
+                        min(current.y0, rects_to_process[i].y0),
+                        max(current.x1, rects_to_process[i].x1),
+                        max(current.y1, rects_to_process[i].y1)
+                    )
+                    rects_to_process.pop(i)
+                    merged = True
+                else:
+                    i += 1
+            
+            if merged:
+                rects_to_process.insert(0, current)
+            else:
+                merged_initial.append(current)
+        
+        # 3. Group by x-coordinates
+        x_groups = {}
+        for rect in merged_initial:
+            matched = False
+            rounded_x0 = 1
+            
+            for gx0 in x_groups.keys():
+                if abs(1 - rounded_x0) <= x_tolerance:
+                    x_groups[gx0].append(rect)
+                    matched = True
+                    break
+            
+            if not matched:
+                x_groups[rounded_x0] = [rect]
+        
+        # 4. Final merge within x-coordinate groups
+        final_rects = []
+        for group in x_groups.values():
+            if not group:
+                continue
+                
+            group.sort(key=lambda r: r.y0)
+            current = group[0]
+            merged_group = []
+            
+            for rect in group[1:]:
+                if (abs(current.y1 - rect.y0) <= threshold):
+                    current = mupdf.Rect(
+                        min(current.x0, rect.x0),
+                        min(current.y0, rect.y0),
+                        max(current.x1, rect.x1),
+                        max(current.y1, rect.y1)
+                    )
+                else:
+                    merged_group.append(current)
+                    current = rect
+                    
+            merged_group.append(current)
+            final_rects.extend(merged_group)
+        
+        return sorted(final_rects, key=lambda r: (r.y0, r.x0))
+        
+
+
+    def convert_to_markdown(self,text_blocks):
+        """
+        Converts text blocks into Markdown format.
+        Args:
+            text_blocks (list): A list of pages, where each page is a list of text blocks, 
+                                and each text block is a list of spans containing text and formatting information.
+        Returns:
+            tuple: A tuple containing two lists:
+                - all_text (list): A list of strings where each string is a page of text converted to Markdown format.
+                - all_text_plain (list): A list of strings where each string is a page of plain text without Markdown formatting.
+        The function processes each span of text within the text blocks, applying Markdown formatting for bold and italic text.
+        It also identifies and formats bullet points and numbered lists according to specified patterns.
+        """
+        
+        def _incCaps(m):
+            return "\n" + m.group(0)
     
+        bullet_patterns = [
+            r'(?=[MDCLXVI])M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})\.\s',
+            r'(\s|^)[●|•|○|·|◦|‣|∙|o|§](\s|$)',# Matches common bullet point characters
+            r'(\s|^)\d+\.(\s|$)',   # Matches numbered lists
+            r'(\s|^)[A-Z]\.(\s|$)',  # Matches alphabetical lists
+            r'(\s|^)[a-z]\.(\s|$)',  # Matches alphabetical lists
+            # r'(\s|^)*[-*•>](\s|$)',  # Matches common bullet point characters
+            # r'(\s|^)[(]?[0-9A-Za-z]+[)](\s|$)'  # Matches parenthesized numbers or letters
+        ]
+        all_text = []
+        all_text_plain = []
+        for page in text_blocks:
+            for block_ in page:
+                block_Text = []
+                block_Text_plain = []
+                for span in block_:
+                    span_Text = ""
+                    span_Text_plain = ""
+                    if "lines" in span.keys():
+                        for line in span["lines"]:
+                            for t in line["spans"]:
+                                if re.sub(r"\s+", "", t["text"]):
+                                    text_t = t["text"].strip()
+                                    span_Text_plain += " " + text_t
+                                    if t["flags"] & 16:
+                                        text_t = f"**{text_t}**"
+                                    elif t['flags'] & 2:
+                                        text_t = f"_{text_t}_"
+                                    span_Text += " " + text_t
+                        if span_Text:
+                            cleaned_text = span_Text.replace("** **"," ")
+                            cleaned_text = cleaned_text.replace("** .","**.")
+                            cleaned_text = cleaned_text.strip()
+
+                            cleaned_text_plain = span_Text_plain.strip()
+                            print(f"c: {cleaned_text_plain}")
+                            if any(re.match(pattern, cleaned_text) for pattern in bullet_patterns):
+                                for pattern_ in bullet_patterns:
+                                    if re.search(pattern_, cleaned_text):
+                                        break
+                                print(pattern_)
+                                if pattern_ == r'(\s|^)[●|•|○|·|◦|‣|∙|o|§](\s|$)':
+                                    cleaned_text = re.sub(f"{pattern_}", "\n- ",cleaned_text)
+                                    cleaned_text_plain = re.sub(f"{pattern_}", "\n- ",cleaned_text_plain)
+                                else:
+                                    cleaned_text = re.sub(f"{pattern_}", _incCaps,cleaned_text)
+                                    cleaned_text_plain = re.sub(f"{pattern_}", _incCaps,cleaned_text_plain)
+                            block_Text.append(cleaned_text)
+                            block_Text_plain.append(cleaned_text_plain)
+                # print(block_Text)
+                all_text.append(" ".join(block_Text))
+                all_text_plain.append(" ".join(block_Text_plain))
+        return all_text, all_text_plain
+
+
     def extract_text_with_clipping(self,doc:mupdf.Document) -> Tuple[List[str], List[str], List[str]]:
         """Extract text from a PDF with clipping, returning lists of lines for each page.
 
@@ -257,167 +529,182 @@ class PDFExtractor:
         >>> plain, html, markdown = extract_text_with_clipping(pdf_path)
         >>> print(plain[0])  # First line of the first page
         "This is the first line of the first page of the PDF"
-        >>> print(html[0])  # First line of HTML from the first page
-        "<p>This is the first line of the first page of the PDF</p>"
         >>> print(markdown[0])  # First line of markdown from the first page
         "# This is the first line of the first page of the PDF"
         """
-        plain, markdown , markdown_text = [], [] , []
+        plain, markdown = [],[]
         
         if doc is None:
             return plain, markdown
 
-        for page_num,page in enumerate(doc):
-            clip_rect = self.create_clipping_rectangle(page)
+        text_blocks = []
+        for page in doc:
+            page_blocks = []
+            rects = []
             
-            bottom = page.rect.height - clip_rect.y1
-            top = clip_rect.y0 + clip_rect.y0 * 0.25 # add some margin to the top
-            page_md = mupdf4llm.to_markdown(doc, pages = [page_num], show_progress=False,write_images=False,table_strategy="lines_strict",margins=(top,bottom))
-            markdown_text.append(page_md)
+            clip_rect = self._create_clipping_rectangle(page)
+            page.add_rect_annot(clip_rect)
             
+            for i,tab in enumerate(page.find_tables(strategy='lines_strict')):  # iterate over all tables
+                page.add_redact_annot(tab.bbox)
             
-            # for i,tab in enumerate(page.find_tables(strategy='lines_strict')):  # iterate over all tables
-            #     page.add_redact_annot(tab.bbox)
+            page.apply_redactions()  # erase all table text
             
-            # page.apply_redactions()  # erase all table text
+            ## Debugging
+            # self._show_image(page, title=f"Page",grayscale=False)
             
-            # Extract plain text and split into lines
-            page_text = page.get_text(clip=clip_rect).splitlines()
-            plain.append([line.strip() for line in page_text if line.strip()])
+            words = page.get_textpage(flags=8+32+1+2).extractBLOCKS()
+            for i, sp in enumerate(words):
+                if (sp[3] > clip_rect[1]) and (sp[1]<clip_rect[1]):
+                    list_intersect_top = list(sp)
+                    list_intersect_top[1] = clip_rect[1] 
+                    words[i] = tuple(list_intersect_top)
 
-            # # Extract HTML and split into lines, filter out image tags
-            # html_text = page.get_text('html', clip=clip_rect).splitlines()
-            # soup = BeautifulSoup("\n".join(html_text), 'html.parser')
-            # # Get rid of images in the HTML
-            # for img in soup.find_all('img'):
-            #     img.decompose()
-            # html.append([line.strip() for line in soup.prettify().splitlines() if line.strip()])
-
-        # Extract markdown
-        markdown = [re.sub(r'\n{2,}','\n',text).replace('-----\n','') for text in markdown_text if text.strip()]
-        markdown = [''.join(text) for text in markdown]
-        
-        #Flatten the lists
-        plain = [line for page in plain for line in page]
-
-        return plain, markdown
+                if (sp[2] > clip_rect[2]) and (sp[0]<clip_rect[2]):
+                    list_intersect_btm = list(sp)
+                    list_intersect_btm[2] = clip_rect[2] 
+                    words[i] = tuple(list_intersect_btm)
     
+            for block in words:
+                rect = mupdf.Rect(block[:4])
+                if re.sub(r"\s+", "", block[4]):
+                    if clip_rect.contains(rect):
+                        rects.append(rect)
+                        page.draw_rect(rect, color=(1, 0, 0), width=2)
+                        
+            processed_rects = self._process_rects(rects, expansion_percent=10, threshold=10,x_tolerance=5)
+            for rect_ in processed_rects:
+                page.draw_rect(rect_, color=(0, 1, 0), width=2)
+                page_blocks.append(page.get_textpage(rect_).extractDICT()['blocks'])
+            
+            text_blocks.append(page_blocks)
+            
+            # # DEBUGGING
+            # if show_pages:
+            #     self._show_image(page, title=f"Page",grayscale=False)
+            
+
+        markdown,plain = self.convert_to_markdown(text_blocks)
+        return plain,markdown
     
-    def extract_images_with_clipping(self,doc:mupdf.Document,upload:bool=False) -> List[Tuple[str,str]]:
-        """Extract images from a PDF with clipping, returning a list of image URLs and names.
+    #! Deprecated
+    # def extract_images_with_clipping(self,doc:mupdf.Document,upload:bool=False) -> List[Tuple[str,str]]:
+    #     """Extract images from a PDF with clipping, returning a list of image URLs and names.
 
-        Args:
-            doc (mupdf.Document): PDF document object
-            upload (bool, optional): Upload images to S3. Defaults to False.
+    #     Args:
+    #         doc (mupdf.Document): PDF document object
+    #         upload (bool, optional): Upload images to S3. Defaults to False.
 
-        Returns:
-            List[Tuple[str,str]]: List of tuples containing image URLs and names
+    #     Returns:
+    #         List[Tuple[str,str]]: List of tuples containing image URLs and names
         
-        Example usage:
-        >>> images = extract_images_with_clipping(doc)
-        >>> print(images[0])
-        ("https://s3.amazonaws.com/bucket/image.jpg","image.jpg")
-        """
-        image_urls = []
-        image_names = []
-        #Image dims check
-        dimlimit = 150  # 100  # each image side must be greater than this
-        relsize = 0.10  # 0.05  # image : image size ratio must be larger than this (10%)
+    #     Example usage:
+    #     >>> images = extract_images_with_clipping(doc)
+    #     >>> print(images[0])
+    #     ("https://s3.amazonaws.com/bucket/image.jpg","image.jpg")
+    #     """
+    #     # Initialize lists
+    #     image_urls = []
+    #     image_names = []
         
-        # Helper functions
-        # @staticmethod
-        # def upload_to_bucket(file_name:str, file_data:object,upload:bool=upload):
-        #     s3 = boto3.client(
-        #         service_name="s3",
-        #         endpoint_url=os.getenv("ENDPOINT_URL"),
-        #         aws_access_key_id=os.getenv("AWS_KEY"),
-        #         aws_secret_access_key=os.getenv("AWS_SECRET"),
-        #         region_name="auto",
-        #     )
-            
-        #     # Upload/Update single file
-        #     if upload:
-        #         s3.upload_fileobj(file_data, "siaran-temp", file_name)
-            
-        #     return f"{os.getenv("S3_URL")}{file_name}"
+    #     #Image dims check
+    #     dimlimit = 150  # 100  # each image side must be greater than this
+    #     relsize = 0.10  # 0.05  # image : image size ratio must be larger than this (10%)
         
-        @staticmethod
-        def recoverpix(doc:mupdf.Document, item:List)->dict:
-            """Recover image data from a PDF document.Will also handle images with transparent backgrounds.
-
-            Args:
-                doc (mupdf.Document): PDF document object
-                item (List): List of image data
-
-            Returns:
-                image_data (Dict): Image data
-            """
+    #     # Helper functions
+    #     @staticmethod
+    #     def upload_to_bucket(file_name:str, file_data:object,upload:bool=upload):
+    #         s3 = boto3.client(
+    #             service_name="s3",
+    #             endpoint_url=os.getenv("ENDPOINT_URL"),
+    #             aws_access_key_id=os.getenv("AWS_KEY"),
+    #             aws_secret_access_key=os.getenv("AWS_SECRET"),
+    #             region_name="auto",
+    #         )
             
-            xref = item[0]  # xref of PDF image
-            smask = item[1]  # xref of its /SMask
-
-            # special case: /SMask or /Mask exists
-            if smask > 0:
-                pix0 = mupdf.Pixmap(doc.extract_image(xref)["image"])
-                if pix0.alpha:  # catch irregular situation
-                    pix0 = mupdf.Pixmap(pix0, 0)  # remove alpha channel
-                mask = mupdf.Pixmap(doc.extract_image(smask)["image"])
-
-                try:
-                    pix = mupdf.Pixmap(pix0, mask)
-                except:  # fallback to original base image in case of problems
-                    pix = mupdf.Pixmap(doc.extract_image(xref)["image"])
-
-                if pix0.n > 3:
-                    ext = "pam"
-                else:
-                    ext = "png"
-
-                return {  # create dictionary expected by caller
-                    "ext": ext,
-                    "colorspace": pix.colorspace.n,
-                    "image": pix.tobytes(ext),
-                }
-
-            # special case: /ColorSpace definition exists
-            # to be sure, we convert these cases to RGB PNG images
-            if "/ColorSpace" in doc.xref_object(xref, compressed=True):
-                pix = mupdf.Pixmap(doc, xref)
-                pix = mupdf.Pixmap(mupdf.csRGB, pix)
-                return {  # create dictionary expected by caller
-                    "ext": "png",
-                    "colorspace": 3,
-                    "image": pix.tobytes("png"),
-                }
-                
-            return doc.extract_image(xref)
-                
-        for i, page in enumerate(doc):
-            img_list = doc.get_page_images(i)
-            # xrefs = [x[0] for x in img_list]
+    #         # Upload/Update single file
+    #         if upload:
+    #             s3.upload_fileobj(file_data, "siaran-temp", file_name)
             
-            for img in img_list:
+    #         return f"{os.getenv("S3_URL")}{file_name}"
+        
+    #     @staticmethod
+    #     def recoverpix(doc:mupdf.Document, item:List)->dict:
+    #         """Recover image data from a PDF document.Will also handle images with transparent backgrounds.
+
+    #         Args:
+    #             doc (mupdf.Document): PDF document object
+    #             item (List): List of image data
+
+    #         Returns:
+    #             image_data (Dict): Image data
+    #         """
+            
+    #         xref = item[0]  # xref of PDF image
+    #         smask = item[1]  # xref of its /SMask
+
+    #         # special case: /SMask or /Mask exists
+    #         if smask > 0:
+    #             pix0 = mupdf.Pixmap(doc.extract_image(xref)["image"])
+    #             if pix0.alpha:  # catch irregular situation
+    #                 pix0 = mupdf.Pixmap(pix0, 0)  # remove alpha channel
+    #             mask = mupdf.Pixmap(doc.extract_image(smask)["image"])
+
+    #             try:
+    #                 pix = mupdf.Pixmap(pix0, mask)
+    #             except:  # fallback to original base image in case of problems
+    #                 pix = mupdf.Pixmap(doc.extract_image(xref)["image"])
+
+    #             if pix0.n > 3:
+    #                 ext = "pam"
+    #             else:
+    #                 ext = "png"
+
+    #             return {  # create dictionary expected by caller
+    #                 "ext": ext,
+    #                 "colorspace": pix.colorspace.n,
+    #                 "image": pix.tobytes(ext),
+    #             }
+
+    #         # special case: /ColorSpace definition exists
+    #         # to be sure, we convert these cases to RGB PNG images
+    #         if "/ColorSpace" in doc.xref_object(xref, compressed=True):
+    #             pix = mupdf.Pixmap(doc, xref)
+    #             pix = mupdf.Pixmap(mupdf.csRGB, pix)
+    #             return {  # create dictionary expected by caller
+    #                 "ext": "png",
+    #                 "colorspace": 3,
+    #                 "image": pix.tobytes("png"),
+    #             }
                 
-                width = img[2]
-                height = img[3]
-                if min(width, height) <= dimlimit:
-                    continue
+    #         return doc.extract_image(xref)
                 
-                image = recoverpix(doc, img)
-                imgdata = image["image"]
+    #     for i, page in enumerate(doc):
+    #         img_list = doc.get_page_images(i)
+    #         # xrefs = [x[0] for x in img_list]
+            
+    #         for img in img_list:
                 
-                if len(imgdata) / (width * height * image['colorspace']) <= relsize:
-                        continue
+    #             width = img[2]
+    #             height = img[3]
+    #             if min(width, height) <= dimlimit:
+    #                 continue
                 
-                img_name = f"{self.filename.split('.')[0]}_img_{i}.png"
-                image_names.append(img_name)
+    #             image = recoverpix(doc, img)
+    #             imgdata = image["image"]
                 
-                # Upload image data directly to S3
-                # with io.BytesIO(imgdata) as img_buffer:
-                #     image_urls.append(upload_to_bucket(img_name, img_buffer))
+    #             if len(imgdata) / (width * height * image['colorspace']) <= relsize:
+    #                     continue
+                
+    #             img_name = f"{self.filename.split('.')[0]}_img_{i}.png"
+    #             image_names.append(img_name)
+                
+    #             # Upload image data directly to S3
+    #             with io.BytesIO(imgdata) as img_buffer:
+    #                 image_urls.append(upload_to_bucket(img_name, img_buffer))
                     
-                with open(self.input_path / img_name, "wb") as f:
-                    f.write(imgdata)
+    #             with open(self.input_path / img_name, "wb") as f:
+    #                 f.write(imgdata)
             
         return zip(image_urls,image_names)
 
@@ -434,7 +721,7 @@ class PDFExtractor:
             ContentModel: ContentModel object
         """
         if len(plain) > 1:
-            return contentModel(plain=plain,markdown=markdown)
+            return contentModel(plain=plain, markdown=markdown)
         else:
             return contentModel(plain=[], markdown=[])
 
@@ -487,7 +774,7 @@ class PDFExtractor:
         return attachments
     
     
-    def write_to_files(self):
+    def _write_to_files(self):
         """Write extracted text and images to files
 
         Args:
@@ -499,11 +786,12 @@ class PDFExtractor:
         
         file_contents = {
             f"{self.filename.split('.')[0]}_plain.txt": "\n".join(self.content_model.plain),
+            # f"{self.filename.split('.')[0]}_html.html": "\n".join(self.content_model.html),
             f"{self.filename.split('.')[0]}_markdown.md": "\n".join(self.content_model.markdown)
         }
 
         for file_name, content in file_contents.items():
-            with open(DIR/"output"/"files"/ file_name, "w") as f:
+            with open(DIR + "output/" +file_name, "w") as f:
                 f.write(content)
 
 
@@ -523,8 +811,7 @@ class PDFExtractor:
         
         start_time = time.time()
         plain, markdown = self.extract_text_with_clipping(doc)
-        # self.write_to_files(plain, html, markdown)
-        self.content_model = self.create_content_model(plain,markdown)
+        self.content_model = self.create_content_model(plain, markdown)
         
         if get_images:
             self.attachment_model = self.create_attachment_model(doc, upload_images=True)
@@ -538,12 +825,11 @@ class PDFExtractor:
         return self.content_model,self.attachment_model
 
 
-# # Test the PDFExtractor class
-# #================================================================================================
-# #================================================================================================
-
+# Test the PDFExtractor class
+#================================================================================================
+#================================================================================================
 # def main(links: List[str]):
-#     link = "https://ekonomi.gov.my/sites/default/files/2023-05/Speech_Affin-Conference_30May2023.pdf"
+#     link = "https://www.moh.gov.my/index.php/database_stores/attach_download/337/2114"
 #     extractor = PDFExtractor()
 #     content_model,attachment_model = extractor.process_pdf(link,get_images=False)
 #     extractor.write_to_files()
@@ -552,8 +838,7 @@ class PDFExtractor:
 
 # if __name__ == "__main__":
 #     from pymongo import MongoClient
-#     import os
-
+    
 #     links = []
 
 #     client = MongoClient(os.getenv("DATABASE_URI"))
@@ -571,4 +856,3 @@ class PDFExtractor:
 #                 links.append(attachment.get('url'))
     
 #     main(links)
-
