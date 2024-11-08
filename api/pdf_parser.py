@@ -225,18 +225,22 @@ class PDFExtractor:
         Returns:
             mupdf.Rect: Clipping rectangle
         """
-        # Convert the page to an image array
+        ## Delete any images 
+        for img in page.get_images():
+            page.delete_image(img[0])
+        
+        ## Convert the page to an image array
         pix = page.get_pixmap()
         img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, 3)
         height, width = img_array.shape[0], img_array.shape[1]
         
-        # Set the parameters
+        ## Set the parameters
         content_threshold = content_threshold
         color_threshold = color_threshold
         margin = int(height * margin_ratio)
         color_row_threshold = color_row_threshold
         
-        # Set the window detection size
+        ## Set the window detection size
         if isinstance(window_detection_size, int):
             window_detection_size = (window_detection_size, window_detection_size)
         
@@ -301,7 +305,7 @@ class PDFExtractor:
         colored_regions = binary_erosion(colored_regions, np.ones(3))
         
         # 5. Detect the start and end of the content region
-        start_y = margin
+        start_y = margin // 2 
         while start_y < height - margin:
             window_size = window_detection_size[0]
             window_end = min(start_y + window_size, height)
@@ -312,7 +316,7 @@ class PDFExtractor:
                 break
         
         ## Set end_y to the bottom of the page by a margin
-        end_y = height - margin
+        end_y = height - margin // 2
         while end_y > start_y:
             window_size = window_detection_size[-1]
             window_start = max(end_y - window_size, 0)
@@ -324,8 +328,7 @@ class PDFExtractor:
         
         # 6. Find the start and end of the content region
         content_start = np.argmax(row_content[start_y:end_y]) + start_y if np.any(row_content[start_y:end_y]) else start_y
-        pad_end_y = round(end_y * 0.08)
-        content_slice = row_content[content_start:end_y - pad_end_y]
+        content_slice = row_content[content_start:end_y]
         content_end = end_y - np.argmax(content_slice[::-1]) if np.any(content_slice) else end_y
         
         # 7. Create the clipping rectangle
@@ -496,7 +499,6 @@ class PDFExtractor:
                             cleaned_text = cleaned_text.strip()
 
                             cleaned_text_plain = span_Text_plain.strip()
-                            print(f"c: {cleaned_text_plain}")
                             if any(re.match(pattern, cleaned_text) for pattern in bullet_patterns):
                                 for pattern_ in bullet_patterns:
                                     if re.search(pattern_, cleaned_text):
@@ -510,7 +512,6 @@ class PDFExtractor:
                                     cleaned_text_plain = re.sub(f"{pattern_}", _incCaps,cleaned_text_plain)
                             block_Text.append(cleaned_text)
                             block_Text_plain.append(cleaned_text_plain)
-                # print(block_Text)
                 all_text.append(" ".join(block_Text))
                 all_text_plain.append(" ".join(block_Text_plain))
         return all_text, all_text_plain
@@ -550,7 +551,7 @@ class PDFExtractor:
             
             page.apply_redactions()  # erase all table text
             
-            ## Debugging
+            #? Debugging
             # self._show_image(page, title=f"Page",grayscale=False)
             
             words = page.get_textpage(flags=8+32+1+2).extractBLOCKS()
@@ -568,7 +569,7 @@ class PDFExtractor:
             for block in words:
                 rect = mupdf.Rect(block[:4])
                 if re.sub(r"\s+", "", block[4]):
-                    if clip_rect.contains(rect):
+                    if clip_rect.contains(rect) or (clip_rect.intersects(rect) and rect.get_area() > 0.7 * clip_rect.get_area()):
                         rects.append(rect)
                         page.draw_rect(rect, color=(1, 0, 0), width=2)
                         
@@ -579,7 +580,7 @@ class PDFExtractor:
             
             text_blocks.append(page_blocks)
             
-            # # DEBUGGING
+            #? DEBUGGING
             # if show_pages:
             #     self._show_image(page, title=f"Page",grayscale=False)
             
