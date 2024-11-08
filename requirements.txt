@@ -9,4 +9,4 @@ requests-html
 numpy>=1.26.4
 beautifulsoup4>=4.12.3
 lxml-html-clean>=0.1.1
-scipy==1.4.1
+scipy>=1.14.1
