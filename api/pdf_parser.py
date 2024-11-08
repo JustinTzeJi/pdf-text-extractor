@@ -226,8 +226,7 @@ class PDFExtractor:
             mupdf.Rect: Clipping rectangle
         """
         ## Delete any images 
-        img_list = page.get_images()
-        for img in img_list:
+        for img in page.get_images():
             page.delete_image(img[0])
         
         ## Convert the page to an image array
