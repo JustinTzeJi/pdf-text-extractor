@@ -18,8 +18,7 @@ import numpy as np
 import logging
 import re
 
-from skimage.morphology import binary_dilation, binary_erosion
-from skimage.filters import gaussian_filter
+from scipy.ndimage import binary_dilation, binary_erosion, gaussian_filter
 from urllib.parse import urlparse
 from typing import List, Tuple,Union
 from dotenv import load_dotenv
