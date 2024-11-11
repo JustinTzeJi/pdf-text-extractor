@@ -18,7 +18,7 @@ import numpy as np
 import logging
 import re
 
-from scipy.ndimage import binary_dilation, binary_erosion, gaussian_filter
+from PIL import Image, ImageFilter
 from urllib.parse import urlparse
 from typing import List, Tuple,Union
 from dotenv import load_dotenv
@@ -245,33 +245,73 @@ class PDFExtractor:
             window_detection_size = (window_detection_size, window_detection_size)
         
         def _detect_colored_regions(img_array: np.ndarray) -> np.ndarray:
-            """Detect colored regions in the image.
-            Calculate the saturation and standard deviation of the RGB channels to detect colored regions
-
+            """Detect colored regions within an image by analyzing RGB color patterns.
+            This function identifies colored regions in an image by examining two key metrics:
+            1. Color saturation - calculated as (max_RGB - min_RGB)/max_RGB
+            2. RGB channel standard deviation - measures color variation across channels
+            The detection is based on thresholding both metrics to identify pixels that likely
+            contain meaningful color information rather than grayscale content.
+                img_array (np.ndarray): 3D numpy array of shape (height, width, 3) containing 
+                    the RGB image data with values in range [0, 255]
+                np.ndarray: 1D array of shape (height,) containing the fraction of colored pixels
+                    in each row. Values range from 0.0 (no colored pixels) to 1.0 (all pixels colored).
+            Note:
+                The function uses two global thresholds:
+                - color_threshold: Minimum saturation value to consider a pixel as colored
+                - std_threshold: Minimum RGB standard deviation to consider a pixel as colored
+                A pixel is considered colored if it exceeds either threshold
+                
             Args:
                 img_array (np.ndarray): Image array
 
             Returns:
                 np.ndarray: Array of colored rows
             """
+            # Normalize RGB values to [0,1] range
             img_normalized = img_array.astype(float) / 255.0
+            
+            # Get max and min RGB values for each pixel
             max_rgb = np.max(img_normalized, axis=2)
             min_rgb = np.min(img_normalized, axis=2)
+            
+            # Small value to avoid division by zero
             eps = 1e-8
+            
+            # Calculate saturation as (max-min)/max for each pixel
+            # Use np.divide with out parameter to handle division by zero
             saturation = np.divide(
                 max_rgb - min_rgb, 
                 max_rgb + eps, 
                 out=np.zeros_like(max_rgb), 
                 where=max_rgb != 0
             )
+            
+            # Calculate standard deviation across RGB channels
             rgb_std = np.std(img_normalized, axis=2)
+            
+            # Detect colored pixels where either:
+            # - Saturation exceeds color_threshold
+            # - RGB standard deviation exceeds std_threshold
             is_colored = (saturation > color_threshold) | (rgb_std > std_threshold)
+            
+            # Calculate fraction of colored pixels in each row
             colored_rows = np.mean(is_colored, axis=1)
+            
             return colored_rows
         
         def _enhance_text_regions(img_array: np.ndarray) -> np.ndarray:
-            """Enhance text regions in the img_array.
-            Use kernel-based dilation to expand text regions and smooth the result with a Gaussian filter.
+            """Enhance text regions in the image array using dilation and smoothing techniques.
+            This function performs several image processing steps:
+            1. Binarizes the image using a threshold of 248
+            2. Applies horizontal dilation with a kernel size of (1,5)
+            3. Applies vertical dilation with a kernel size of (3,1)
+            4. Smooths the image using Gaussian blur with radius 1
+            5. Normalizes the final image to [0,1] range
+                img_array (np.ndarray): Input image array, typically grayscale
+                np.ndarray: Normalized image array with enhanced text regions, values in range [0,1]
+            Note:
+                This function is particularly useful for improving text detection in documents
+                by making text regions more prominent and reducing noise.
 
             Args:
                 img_array (np.ndarray): img_array array
@@ -279,12 +319,22 @@ class PDFExtractor:
             Returns:
                 normalized (np.ndarray): Normalized img_array array
             """
+            
+            # Convert the image to binary by thresholding
             binary = img_array < 248
+            
+            # Apply horizontal dilation
             horizontal_kernel = np.ones((1, 5))
-            dilated_horizontal = binary_dilation(binary, horizontal_kernel)
+            dilated_horizontal = np.apply_along_axis(lambda m: np.convolve(m, horizontal_kernel.flatten(), mode='same'), axis=1, arr=binary.astype(np.uint8))
+            
+            # Apply vertical dilation
             vertical_kernel = np.ones((3, 1))
-            dilated = binary_dilation(dilated_horizontal, vertical_kernel)
-            smoothed = gaussian_filter(dilated.astype(float), sigma=1)
+            dilated = np.apply_along_axis(lambda m: np.convolve(m, vertical_kernel.flatten(), mode='same'), axis=0, arr=dilated_horizontal)
+            
+            # Smooth the image using Gaussian blur
+            smoothed = np.array(Image.fromarray(dilated).convert("L").filter(ImageFilter.GaussianBlur(radius=1)))
+            
+            # Normalize the image to the range [0, 1]
             normalized = (smoothed - smoothed.min()) / (smoothed.max() - smoothed.min())
             return normalized
         
@@ -301,8 +351,9 @@ class PDFExtractor:
         ## Detect colored regions
         colored_regions = colored_rows >= color_row_threshold
         ## Expand and smooth the colored regions
-        colored_regions = binary_dilation(colored_regions, np.ones(5))
-        colored_regions = binary_erosion(colored_regions, np.ones(3))
+        colored_regions = np.apply_along_axis(lambda m: np.convolve(m, np.ones(5), mode='same'), axis=0, arr=colored_regions.astype(np.uint8))
+        colored_regions = np.apply_along_axis(lambda m: np.convolve(m, np.ones(3), mode='same'), axis=0, arr=colored_regions)
+        
         
         # 5. Detect the start and end of the content region
         start_y = margin // 2 
@@ -569,7 +620,7 @@ class PDFExtractor:
             for block in words:
                 rect = mupdf.Rect(block[:4])
                 if re.sub(r"\s+", "", block[4]):
-                    if clip_rect.contains(rect) or (clip_rect.intersects(rect) and rect.get_area() > 0.7 * clip_rect.get_area()):
+                    if clip_rect.contains(rect) or (clip_rect.intersects(rect) and rect.get_area() > 0.5 * clip_rect.get_area()):
                         rects.append(rect)
                         page.draw_rect(rect, color=(1, 0, 0), width=2)
                         
