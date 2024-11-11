@@ -623,8 +623,19 @@ class PDFExtractor:
                     if clip_rect.contains(rect) or (clip_rect.intersects(rect) and rect.get_area() > 0.5 * clip_rect.get_area()):
                         rects.append(rect)
                         page.draw_rect(rect, color=(1, 0, 0), width=2)
+
+            rects.sort(key=lambda r: r.y0)
+            rect_distance = []
+            for i in range(len(rects)):
+                if i+1 < len(rects):
+                    rect_distance.append(rects[i+1][1] - rects[i][3])
+            
+            if np.median(rect_distance) > 12:
+                threshold_Add = 5
+            else:
+                threshold_Add = 0
                         
-            processed_rects = self._process_rects(rects, expansion_percent=10, threshold=10,x_tolerance=5)
+            processed_rects = self._process_rects(rects, expansion_percent=10, threshold=12+threshold_Add ,x_tolerance=5)
             for rect_ in processed_rects:
                 page.draw_rect(rect_, color=(0, 1, 0), width=2)
                 page_blocks.append(page.get_textpage(rect_).extractDICT()['blocks'])
