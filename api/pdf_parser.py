@@ -598,7 +598,8 @@ class PDFExtractor:
             page.add_rect_annot(clip_rect)
             
             for i,tab in enumerate(page.find_tables(strategy='lines_strict')):  # iterate over all tables
-                page.add_redact_annot(tab.bbox)
+                if clip_rect.contains(tab.bbox):
+                    page.add_redact_annot(tab.bbox)
             
             page.apply_redactions()  # erase all table text
             
