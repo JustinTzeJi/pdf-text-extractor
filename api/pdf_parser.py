@@ -514,10 +514,17 @@ class PDFExtractor:
         
         def _incCaps(m):
             return "\n" + m.group(0)
-    
+
+        def _add_back_whitespace(ori_text, markdowned_text):
+            if re.search(r'^\s', ori_text):
+                markdowned_text = " "+markdowned_text
+            if re.search(r'\s\Z', ori_text):
+                markdowned_text = markdowned_text+" "
+            return markdowned_text
+
         bullet_patterns = [
             r'(?=[MDCLXVI])M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})\.\s',
-            r'(\s|^)[●|•|○|·|◦|‣|∙|o|§](\s|$)',# Matches common bullet point characters
+            r'(\s|^)[●|•|○|·|◦|‣|∙|o|§|](\s|$)',# Matches common bullet point characters
             r'(\s|^)\d+\.(\s|$)',   # Matches numbered lists
             r'(\s|^)[A-Z]\.(\s|$)',  # Matches alphabetical lists
             r'(\s|^)[a-z]\.(\s|$)',  # Matches alphabetical lists
@@ -535,18 +542,25 @@ class PDFExtractor:
                     span_Text_plain = ""
                     if "lines" in span.keys():
                         for line in span["lines"]:
-                            for t in line["spans"]:
-                                if re.sub(r"\s+", "", t["text"]):
-                                    text_t = t["text"].strip()
-                                    span_Text_plain += " " + text_t
+                            for itx_, t in enumerate(line["spans"]):
+                                filler = " "
+                                if itx_ > 0:
+                                    if abs(t["bbox"][3] - line["spans"][itx_-1]["bbox"][3]) <= 5:
+                                        filler = ""
+                                text_t = t["text"]
+                                span_Text_plain += filler + text_t
+                                if t["text"].strip():
                                     if t["flags"] & 16:
-                                        text_t = f"**{text_t}**"
+                                        text_t = f"**{text_t.strip()}**"
+                                        text_t = _add_back_whitespace(t["text"],text_t)
                                     elif t['flags'] & 2:
-                                        text_t = f"_{text_t}_"
-                                    span_Text += " " + text_t
+                                        text_t = f"_{text_t.strip()}_"
+                                        text_t = _add_back_whitespace(t["text"],text_t)
+                                span_Text += filler + text_t
                         if span_Text:
-                            cleaned_text = span_Text.replace("** **"," ")
-                            cleaned_text = cleaned_text.replace("** .","**.")
+                            cleaned_text = re.sub(r"\*\*\s\*\*"," ", span_Text)
+                            cleaned_text = re.sub(r"\*\*\s\.","**.", cleaned_text)
+                            cleaned_text = re.sub(r"\*\*\*\*"," ", cleaned_text)
                             cleaned_text = cleaned_text.strip()
 
                             cleaned_text_plain = span_Text_plain.strip()
@@ -554,16 +568,17 @@ class PDFExtractor:
                                 for pattern_ in bullet_patterns:
                                     if re.search(pattern_, cleaned_text):
                                         break
-                                print(pattern_)
-                                if pattern_ == r'(\s|^)[●|•|○|·|◦|‣|∙|o|§](\s|$)':
+                                if pattern_ == r'(\s|^)[●|•|○|·|◦|‣|∙|o|§|](\s|$)':
                                     cleaned_text = re.sub(f"{pattern_}", "\n- ",cleaned_text)
                                     cleaned_text_plain = re.sub(f"{pattern_}", "\n- ",cleaned_text_plain)
                                 else:
                                     cleaned_text = re.sub(f"{pattern_}", _incCaps,cleaned_text)
                                     cleaned_text_plain = re.sub(f"{pattern_}", _incCaps,cleaned_text_plain)
+                            cleaned_text = re.sub(r"[ \t]{2,}"," ", cleaned_text)
+                            cleaned_text_plain = re.sub(r"[ \t]{2,}"," ", cleaned_text_plain)
                             block_Text.append(cleaned_text)
                             block_Text_plain.append(cleaned_text_plain)
-                all_text.append(" ".join(block_Text))
+                all_text.append(re.sub(r"\*\*\s\*\*"," " ," ".join(block_Text)))
                 all_text_plain.append(" ".join(block_Text_plain))
         return all_text, all_text_plain
 
