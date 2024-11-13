@@ -361,7 +361,7 @@ class PDFExtractor:
             window_size = window_detection_size[0]
             window_end = min(start_y + window_size, height)
             # Check if the window contains colored regions or only content
-            if np.any(colored_regions[start_y:window_end]) or np.all(row_content[start_y:window_end]):
+            if np.all(colored_regions[start_y:window_end]) or np.all(row_content[start_y:window_end]):
                 start_y += int(height * 0.08)
             else:
                 break
@@ -615,6 +615,14 @@ class PDFExtractor:
             for i,tab in enumerate(page.find_tables(strategy='lines_strict')):  # iterate over all tables
                 if clip_rect.contains(tab.bbox):
                     page.add_redact_annot(tab.bbox)
+                    
+            #angle check
+            words_dir = page.get_textpage(flags=8+32+1+2).extractDICT()['blocks']
+            for block in words_dir:
+                for line in block['lines']:
+                    angle = round(np.degrees(np.arctan2(line['dir'][1], line['dir'][0])))
+                    if angle not in range(-5,6):
+                        page.add_redact_annot(mupdf.Rect(*line['bbox']))
             
             page.apply_redactions()  # erase all table text
             
@@ -660,10 +668,10 @@ class PDFExtractor:
             
             #? DEBUGGING
             # if show_pages:
-            import io
-            image = Image.open(io.BytesIO(page.get_pixmap().tobytes("png")))
-            image.show()
-            
+                # import io
+                # image = Image.open(io.BytesIO(page.get_pixmap().tobytes("png")))
+                # image.show()
+                
 
         markdown,plain = self.convert_to_markdown(text_blocks)
         return plain,markdown
