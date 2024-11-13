@@ -564,7 +564,7 @@ class PDFExtractor:
                             cleaned_text = cleaned_text.strip()
 
                             cleaned_text_plain = span_Text_plain.strip()
-                            if any(re.match(pattern, cleaned_text) for pattern in bullet_patterns):
+                            if any(re.search(pattern, cleaned_text) for pattern in bullet_patterns):
                                 for pattern_ in bullet_patterns:
                                     if re.search(pattern_, cleaned_text):
                                         break
@@ -660,7 +660,9 @@ class PDFExtractor:
             
             #? DEBUGGING
             # if show_pages:
-            #     self._show_image(page, title=f"Page",grayscale=False)
+            import io
+            image = Image.open(io.BytesIO(page.get_pixmap().tobytes("png")))
+            image.show()
             
 
         markdown,plain = self.convert_to_markdown(text_blocks)
