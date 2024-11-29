@@ -636,8 +636,9 @@ class PDFExtractor:
             #? Debugging
             # self._show_image(page, title=f"Page",grayscale=False)
             
-            words = page.get_textpage(flags=8+32+1+2).extractBLOCKS()
+            words = page.get_textpage(flags=8+32+1+2).extractDICT()['blocks']
             for i, sp in enumerate(words):
+                sp = sp['bbox']
                 if (sp[3] > clip_rect[1]) and (sp[1]<clip_rect[1]):
                     list_intersect_top = list(sp)
                     list_intersect_top[1] = clip_rect[1] 
@@ -647,13 +648,33 @@ class PDFExtractor:
                     list_intersect_btm = list(sp)
                     list_intersect_btm[2] = clip_rect[2] 
                     words[i] = tuple(list_intersect_btm)
-    
-            for block in words:
-                rect = mupdf.Rect(block[:4])
-                if re.sub(r"\s+", "", block[4]):
-                    if clip_rect.contains(rect) or (clip_rect.intersects(rect) and rect.get_area() > 0.5 * clip_rect.get_area()):
-                        rects.append(rect)
-                        page.draw_rect(rect, color=(1, 0, 0), width=2)
+                    
+            for block in words['blocks']:
+                if isinstance(block, dict):
+                    rect = mupdf.Rect(block['bbox'])
+                    page.draw_rect(rect, color=(0, 0, 1), width=1)
+                    
+                    lines = block['lines'][0]
+                    spans = lines['spans'][0]
+                    
+                    # for span in lines['spans']:
+                    #     page.draw_rect(span['bbox'], color=(0, 0.5, 1), width=1)
+                        
+                    # for line in block['lines']:
+                    #     print(line)
+                    #     page.draw_rect(line['bbox'], color=(1, 0.5, 0), width=1)
+
+                    if re.sub(r"\s+", "", spans['text']):
+                        if clip_rect.contains(rect) or (clip_rect.intersects(rect) and rect.get_area() > 0.5 * clip_rect.get_area()):
+                            rects.append(rect)
+                            page.draw_rect(rect, color=(1, 0, 0), width=2)
+                            
+            # for block in words:
+            #     rect = mupdf.Rect(block[:4])
+            #     if re.sub(r"\s+", "", block[4]):
+            #         if clip_rect.contains(rect) or (clip_rect.intersects(rect) and rect.get_area() > 0.5 * clip_rect.get_area()):
+            #             rects.append(rect)
+            #             page.draw_rect(rect, color=(1, 0, 0), width=2)
 
             rects.sort(key=lambda r: r.y0)
             rect_distance = []
