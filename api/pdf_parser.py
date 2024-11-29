@@ -186,6 +186,7 @@ class PDFExtractor:
         
         # Stream the PDF content to PyMuPDF
         try:
+            mupdf.TOOLS.set_small_glyph_heights(True)
             doc = mupdf.Document(stream=response.content,filetype="pdf")
             # Get Metadata
             self.get_metadata(doc)
@@ -534,6 +535,7 @@ class PDFExtractor:
         all_text = []
         all_text_plain = []
         for page in text_blocks:
+            prev_span_bbox_y0 = 0.0
             for block_ in page:
                 block_Text = []
                 block_Text_plain = []
@@ -542,12 +544,15 @@ class PDFExtractor:
                     span_Text_plain = ""
                     if "lines" in span.keys():
                         for line in span["lines"]:
+                            span_len = len(line["spans"])
                             for itx_, t in enumerate(line["spans"]):
                                 filler = " "
                                 if itx_ > 0:
                                     if abs(t["bbox"][3] - line["spans"][itx_-1]["bbox"][3]) <= 5:
                                         filler = ""
                                 text_t = t["text"]
+                                if span_len == 1 and round(t["bbox"][1], 0) != round(prev_span_bbox_y0, 0) and not re.sub(r"\s+", "", text_t):
+                                    text_t = "\n\n"
                                 span_Text_plain += filler + text_t
                                 if t["text"].strip():
                                     if t["flags"] & 16:
@@ -557,13 +562,15 @@ class PDFExtractor:
                                         text_t = f"_{text_t.strip()}_"
                                         text_t = _add_back_whitespace(t["text"],text_t)
                                 span_Text += filler + text_t
+
+                                prev_span_bbox_y0 = t["bbox"][1]
                         if span_Text:
                             cleaned_text = re.sub(r"\*\*\s\*\*"," ", span_Text)
                             cleaned_text = re.sub(r"\*\*\s\.","**.", cleaned_text)
                             cleaned_text = re.sub(r"\*\*\*\*"," ", cleaned_text)
-                            cleaned_text = cleaned_text.strip()
+                            cleaned_text = cleaned_text.strip(" ")
 
-                            cleaned_text_plain = span_Text_plain.strip()
+                            cleaned_text_plain = span_Text_plain.strip(" ")
                             if any(re.search(pattern, cleaned_text) for pattern in bullet_patterns):
                                 for pattern_ in bullet_patterns:
                                     if re.search(pattern_, cleaned_text):
