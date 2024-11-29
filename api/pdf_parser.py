@@ -663,6 +663,8 @@ class PDFExtractor:
             
             if np.median(rect_distance) > 12:
                 threshold_Add = 5
+            elif np.mean(rect_distance) < 11:
+                threshold_Add = -3
             else:
                 threshold_Add = 0
                         
