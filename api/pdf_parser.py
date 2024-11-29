@@ -526,7 +526,7 @@ class PDFExtractor:
         bullet_patterns = [
             r'(?=[MDCLXVI])M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})\.\s',
             r'(\s|^)[●|•|○|·|◦|‣|∙|o|§|](\s|$)',# Matches common bullet point characters
-            r'(\s|^)\d+\.(\s|$)',   # Matches numbered lists
+            r'(\s|^)\d{3}\.(\s|$)',   # Matches numbered lists
             r'(\s|^)[A-Z]\.(\s|$)',  # Matches alphabetical lists
             r'(\s|^)[a-z]\.(\s|$)',  # Matches alphabetical lists
             # r'(\s|^)*[-*•>](\s|$)',  # Matches common bullet point characters
