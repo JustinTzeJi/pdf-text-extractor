@@ -667,6 +667,9 @@ class PDFExtractor:
                 threshold_Add = -3
             else:
                 threshold_Add = 0
+
+            if np.median(rect_distance) or np.mean(rect_distance) < 10:
+                threshold_Add = -4
                         
             processed_rects = self._process_rects(rects, expansion_percent=10, threshold=12+threshold_Add ,x_tolerance=5)
             for rect_ in processed_rects:
