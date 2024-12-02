@@ -186,6 +186,7 @@ class PDFExtractor:
         
         # Stream the PDF content to PyMuPDF
         try:
+            mupdf.TOOLS.set_small_glyph_heights(True)
             doc = mupdf.Document(stream=response.content,filetype="pdf")
             # Get Metadata
             self.get_metadata(doc)
@@ -513,7 +514,7 @@ class PDFExtractor:
         """
         
         def _incCaps(m):
-            return "\n" + m.group(0)
+            return "\n\n" + m.group(0)
 
         def _add_back_whitespace(ori_text, markdowned_text):
             if re.search(r'^\s', ori_text):
@@ -524,16 +525,17 @@ class PDFExtractor:
 
         bullet_patterns = [
             r'(?=[MDCLXVI])M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})\.\s',
-            r'(\s|^)[●|•|○|·|◦|‣|∙|o|§|](\s|$)',# Matches common bullet point characters
-            r'(\s|^)\d+\.(\s|$)',   # Matches numbered lists
-            r'(\s|^)[A-Z]\.(\s|$)',  # Matches alphabetical lists
-            r'(\s|^)[a-z]\.(\s|$)',  # Matches alphabetical lists
+            r'(\s|^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7|Ø(\s|$)',# Matches common bullet point characters
+            r'(\s|^)\d{1,3}\.(\s|$)',   # Matches numbered lists
+            r'(\s|^)[A-Za-z]{1,3}\.(\s|$)',  # Matches alphabetical lists
+            r'(\s|^)[A-Za-z]{1,3}\)(\s|$)',  # Matches alphabetical lists
             # r'(\s|^)*[-*•>](\s|$)',  # Matches common bullet point characters
             # r'(\s|^)[(]?[0-9A-Za-z]+[)](\s|$)'  # Matches parenthesized numbers or letters
         ]
         all_text = []
         all_text_plain = []
         for page in text_blocks:
+            prev_span_bbox_y0 = 0.0
             for block_ in page:
                 block_Text = []
                 block_Text_plain = []
@@ -542,12 +544,15 @@ class PDFExtractor:
                     span_Text_plain = ""
                     if "lines" in span.keys():
                         for line in span["lines"]:
+                            span_len = len(line["spans"])
                             for itx_, t in enumerate(line["spans"]):
                                 filler = " "
                                 if itx_ > 0:
                                     if abs(t["bbox"][3] - line["spans"][itx_-1]["bbox"][3]) <= 5:
                                         filler = ""
                                 text_t = t["text"]
+                                if span_len == 1 and round(t["bbox"][1], 0) != round(prev_span_bbox_y0, 0) and not re.sub(r"\s+", "", text_t):
+                                    text_t = "\n\n"
                                 span_Text_plain += filler + text_t
                                 if t["text"].strip():
                                     if t["flags"] & 16:
@@ -557,18 +562,20 @@ class PDFExtractor:
                                         text_t = f"_{text_t.strip()}_"
                                         text_t = _add_back_whitespace(t["text"],text_t)
                                 span_Text += filler + text_t
+
+                                prev_span_bbox_y0 = t["bbox"][1]
                         if span_Text:
                             cleaned_text = re.sub(r"\*\*\s\*\*"," ", span_Text)
                             cleaned_text = re.sub(r"\*\*\s\.","**.", cleaned_text)
                             cleaned_text = re.sub(r"\*\*\*\*"," ", cleaned_text)
-                            cleaned_text = cleaned_text.strip()
+                            cleaned_text = cleaned_text.strip(" ")
 
-                            cleaned_text_plain = span_Text_plain.strip()
+                            cleaned_text_plain = span_Text_plain.strip(" ")
                             if any(re.search(pattern, cleaned_text) for pattern in bullet_patterns):
                                 for pattern_ in bullet_patterns:
                                     if re.search(pattern_, cleaned_text):
                                         break
-                                if pattern_ == r'(\s|^)[●|•|○|·|◦|‣|∙|o|§|](\s|$)':
+                                if pattern_ == r'(\s|^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7|Ø(\s|$)':
                                     cleaned_text = re.sub(f"{pattern_}", "\n- ",cleaned_text)
                                     cleaned_text_plain = re.sub(f"{pattern_}", "\n- ",cleaned_text_plain)
                                 else:
@@ -653,11 +660,18 @@ class PDFExtractor:
             for i in range(len(rects)):
                 if i+1 < len(rects):
                     rect_distance.append(rects[i+1][1] - rects[i][3])
-            
-            if np.median(rect_distance) > 12:
+            print(f"med: {np.median(rect_distance)}")
+            print(f"mean: {np.mean(rect_distance)}")
+
+            if np.median(rect_distance) > 12 and np.mean(rect_distance) > 12:
                 threshold_Add = 5
+            elif np.mean(rect_distance) < 11:
+                threshold_Add = -3
             else:
                 threshold_Add = 0
+
+            if np.median(rect_distance) < 10 or np.mean(rect_distance) < 10:
+                threshold_Add = -4
                         
             processed_rects = self._process_rects(rects, expansion_percent=10, threshold=12+threshold_Add ,x_tolerance=5)
             for rect_ in processed_rects:
