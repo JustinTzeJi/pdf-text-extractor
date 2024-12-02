@@ -525,10 +525,10 @@ class PDFExtractor:
 
         bullet_patterns = [
             r'(?=[MDCLXVI])M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})\.\s',
-            r'(\s|^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7(\s|$)',# Matches common bullet point characters
-            r'(\s|^)\d{3}\.(\s|$)',   # Matches numbered lists
-            r'(\s|^)[A-Z]\.(\s|$)',  # Matches alphabetical lists
-            r'(\s|^)[a-z]\.(\s|$)',  # Matches alphabetical lists
+            r'(\s|^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7|Ø(\s|$)',# Matches common bullet point characters
+            r'(\s|^)\d{1,3}\.(\s|$)',   # Matches numbered lists
+            r'(\s|^)[A-Za-z]{1,3}\.(\s|$)',  # Matches alphabetical lists
+            r'(\s|^)[A-Za-z]{1,3}\)(\s|$)',  # Matches alphabetical lists
             # r'(\s|^)*[-*•>](\s|$)',  # Matches common bullet point characters
             # r'(\s|^)[(]?[0-9A-Za-z]+[)](\s|$)'  # Matches parenthesized numbers or letters
         ]
@@ -575,7 +575,7 @@ class PDFExtractor:
                                 for pattern_ in bullet_patterns:
                                     if re.search(pattern_, cleaned_text):
                                         break
-                                if pattern_ == r'(\s|^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7(\s|$)':
+                                if pattern_ == r'(\s|^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7|Ø(\s|$)':
                                     cleaned_text = re.sub(f"{pattern_}", "\n- ",cleaned_text)
                                     cleaned_text_plain = re.sub(f"{pattern_}", "\n- ",cleaned_text_plain)
                                 else:
