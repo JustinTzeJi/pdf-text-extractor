@@ -660,15 +660,17 @@ class PDFExtractor:
             for i in range(len(rects)):
                 if i+1 < len(rects):
                     rect_distance.append(rects[i+1][1] - rects[i][3])
-            
-            if np.median(rect_distance) > 12:
+            print(f"med: {np.median(rect_distance)}")
+            print(f"mean: {np.mean(rect_distance)}")
+
+            if np.median(rect_distance) > 12 and np.mean(rect_distance) > 12:
                 threshold_Add = 5
             elif np.mean(rect_distance) < 11:
                 threshold_Add = -3
             else:
                 threshold_Add = 0
 
-            if np.median(rect_distance) or np.mean(rect_distance) < 10:
+            if np.median(rect_distance) < 10 or np.mean(rect_distance) < 10:
                 threshold_Add = -4
                         
             processed_rects = self._process_rects(rects, expansion_percent=10, threshold=12+threshold_Add ,x_tolerance=5)
