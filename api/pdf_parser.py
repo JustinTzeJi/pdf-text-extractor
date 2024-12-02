@@ -527,8 +527,8 @@ class PDFExtractor:
             r'(?=[MDCLXVI])M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})\.\s',
             r'(\s|^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7|Ø(\s|$)',# Matches common bullet point characters
             r'(\s|^)\d{1,3}\.(\s|$)',   # Matches numbered lists
-            r'(\s|^)[A-Za-z]{1,3}\.(\s|$)',  # Matches alphabetical lists
-            r'(\s|^)[A-Za-z]{1,3}\)(\s|$)',  # Matches alphabetical lists
+            r'(\s|^)[MDCLXVI|mdclxvi]{1,3}\.(\s|$)',  # Matches alphabetical lists
+            r'(\s|^)[MDCLXVI|mdclxvi]{1,3}\)(\s|$)',  # Matches alphabetical lists
             # r'(\s|^)*[-*•>](\s|$)',  # Matches common bullet point characters
             # r'(\s|^)[(]?[0-9A-Za-z]+[)](\s|$)'  # Matches parenthesized numbers or letters
         ]
