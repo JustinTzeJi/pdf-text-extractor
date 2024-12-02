@@ -514,7 +514,7 @@ class PDFExtractor:
         """
         
         def _incCaps(m):
-            return "\n" + m.group(0)
+            return "\n\n" + m.group(0)
 
         def _add_back_whitespace(ori_text, markdowned_text):
             if re.search(r'^\s', ori_text):
