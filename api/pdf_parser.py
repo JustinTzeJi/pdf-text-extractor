@@ -612,7 +612,7 @@ class PDFExtractor:
             return plain, markdown
 
         text_blocks = []
-        for page in doc:
+        for page_num, page in enumerate(doc):
             page_blocks = []
             rects = []
             
@@ -672,7 +672,8 @@ class PDFExtractor:
 
             if np.median(rect_distance) < 10 or np.mean(rect_distance) < 10:
                 threshold_Add = -4
-                        
+            if any("Geologica" in str(str_) for li in doc.get_page_fonts(page_num) for str_ in li):
+                threshold_Add = -2
             processed_rects = self._process_rects(rects, expansion_percent=10, threshold=12+threshold_Add ,x_tolerance=5)
             for rect_ in processed_rects:
                 page.draw_rect(rect_, color=(0, 1, 0), width=2)
