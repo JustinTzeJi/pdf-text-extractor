@@ -228,7 +228,10 @@ class PDFExtractor:
         """
         ## Delete any images 
         for img in page.get_images():
-            page.delete_image(img[0])
+            try:
+                page.delete_image(img[0])
+            except ValueError:
+                pass
         
         ## Convert the page to an image array
         pix = page.get_pixmap()
