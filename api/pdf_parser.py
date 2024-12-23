@@ -540,7 +540,7 @@ class PDFExtractor:
                 line_y = (text_line["bbox"][1], text_line["bbox"][3])
 
                 if prev_spacing_width:
-                    if spacing_width <= prev_spacing_width and spacing_width <= round(
+                    if ((spacing_width- prev_spacing_width)<= 1 )and spacing_width <= round(
                         line_width * line_spacing, 0
                     ):
                         # print("same line")
