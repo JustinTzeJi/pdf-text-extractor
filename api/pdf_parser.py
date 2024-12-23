@@ -449,7 +449,6 @@ class PDFExtractor:
 
         def markdown_formatting(text, flag, type):
             def pattern_fix(m):
-                print(m)
                 return "\n" + m.group(0)
 
             bullet_patterns = r"(^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7|Ø(\s|$)" # Matches common bullet point characters
@@ -462,7 +461,7 @@ class PDFExtractor:
             ]
 
             cleaned_text = cleaned_text_plain = text
-            cleaned_text = re.sub(r"(\_){3,}", "", cleaned_text)
+            cleaned_text = re.sub(r"(\_|\—){3,}", "", cleaned_text)
             cleaned_text = cleaned_text.replace("*",r"\*")
             cleaned_text = cleaned_text.replace("_",r"\_")
 
@@ -480,12 +479,13 @@ class PDFExtractor:
             if flag & 2**4:
                 cleaned_text = f"**{cleaned_text}**"
                 cleaned_text = re.sub(r'^\*\* ', " **", cleaned_text)
-                cleaned_text = re.sub(r' \*\*$', "** ", cleaned_text)
+                cleaned_text = re.sub(r'[\s]{1,}\*\*(\s?)*$', "** ", cleaned_text)
 
             elif flag & 2**1:
                 cleaned_text = f"_{cleaned_text}_"
                 cleaned_text = re.sub(r'^\_ ', " _", cleaned_text)
                 cleaned_text = re.sub(r' \_$', "_ ", cleaned_text)
+                cleaned_text = re.sub(r'[\s]{1,}\_(\s?)*$', "_ ", cleaned_text)
 
             if type == "plain":
                 return cleaned_text_plain
