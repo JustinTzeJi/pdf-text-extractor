@@ -462,6 +462,7 @@ class PDFExtractor:
             ]
 
             cleaned_text = cleaned_text_plain = text
+            cleaned_text = re.sub(r"(\_){3,}", "", cleaned_text)
             cleaned_text = cleaned_text.replace("*",r"\*")
             cleaned_text = cleaned_text.replace("_",r"\_")
 
@@ -602,7 +603,7 @@ class PDFExtractor:
             text_list = []
             text_list_md = []
             for page_num, page in enumerate(doc):
-                dict_test = page.get_textpage(flags=8 + 32 + 1 + 2).extractDICT(sort=True)
+                dict_test = page.get_textpage().extractDICT(sort=True)
                 # print(dict_test)
 
                 line_fixed = span_prep(dict_test)
