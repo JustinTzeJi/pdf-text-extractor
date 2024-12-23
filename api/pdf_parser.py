@@ -480,10 +480,14 @@ class PDFExtractor:
 
             if flag & 16:
                 cleaned_text = f"**{cleaned_text}**"
+                cleaned_text = re.sub(r'^\*\* ', " **", cleaned_text)
+                cleaned_text = re.sub(r' \*\*$', "** ", cleaned_text)
 
             elif flag & 2:
                 cleaned_text = f"_{cleaned_text}_"
-            
+                cleaned_text = re.sub(r'^\_ ', " _", cleaned_text)
+                cleaned_text = re.sub(r' \_$', "_ ", cleaned_text)
+
             if type == "plain":
                 return cleaned_text_plain
             elif type == "markdown":
@@ -561,10 +565,10 @@ class PDFExtractor:
             regex_checklist = [
                 (r"[\*]{4}", ""),
                 (r"[\*]{2}\.", "**."),
-                (r"[\*]{2}\s[\*]{2}", " "),
+                (r"[\*]{2}\s*[\*]{2}", " "),
                 (r"[\_]{2}", ""),
                 (r"[\_]{1}\.", "__."),
-                (r"[\_]{1}\s[\_]{1}", " "),
+                (r"[\_]{1}\s*[\_]{1}", " "),
                 (r"[\n]{2,}",r"\n\n"),
             ]
 
