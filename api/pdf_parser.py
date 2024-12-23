@@ -478,12 +478,12 @@ class PDFExtractor:
                         cleaned_text_plain = re.sub(f"{pattern_}", pattern_fix,cleaned_text_plain)
                         continue
 
-            if flag & 16:
+            if flag & 2**4:
                 cleaned_text = f"**{cleaned_text}**"
                 cleaned_text = re.sub(r'^\*\* ', " **", cleaned_text)
                 cleaned_text = re.sub(r' \*\*$', "** ", cleaned_text)
 
-            elif flag & 2:
+            elif flag & 2**1:
                 cleaned_text = f"_{cleaned_text}_"
                 cleaned_text = re.sub(r'^\_ ', " _", cleaned_text)
                 cleaned_text = re.sub(r' \_$', "_ ", cleaned_text)
