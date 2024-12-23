@@ -452,9 +452,7 @@ class PDFExtractor:
                 print(m)
                 return "\n" + m.group(0)
 
-            bullet_patterns = (
-                r"(^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7|Ø(\s|$)",
-            )  # Matches common bullet point characters
+            bullet_patterns = r"(^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7|Ø(\s|$)" # Matches common bullet point characters
 
             numbered_list_pattern = [
                 r'(^)(\s?)\d{1,3}\.(\s|$)',   # Matches numbered lists
@@ -467,7 +465,7 @@ class PDFExtractor:
             cleaned_text = cleaned_text.replace("*",r"\*")
             cleaned_text = cleaned_text.replace("_",r"\_")
 
-            if re.search(F"{bullet_patterns}", cleaned_text):
+            if re.search(bullet_patterns, cleaned_text):
                 cleaned_text = re.sub(f"{bullet_patterns}", "\n- ", cleaned_text)
                 cleaned_text_plain = re.sub(f"{bullet_patterns}", "\n- ", cleaned_text_plain)
 
