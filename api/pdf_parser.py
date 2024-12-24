@@ -499,7 +499,7 @@ class PDFExtractor:
             line_width = None
             spacing_width = None
             prev_spacing_width = 0
-            line_spacing = 0.8
+            line_spacing = 0.9
             block_text = []
             block_text_md = []
             line_text_plain = []
