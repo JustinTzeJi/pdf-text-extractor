@@ -417,18 +417,19 @@ class PDFExtractor:
                 span_curr = None
                 all_span = []
                 for enumspan, span in enumerate(block_list_dict["lines"]):
-                    # print(span["spans"][0]["bbox"] , span_y1)
-                    if enumspan == 0:
-                        span_y1 = span["spans"][0]["bbox"][3]
-                        span_curr = [span]
-                    else:
-                        if span["spans"][0]["bbox"][1] > span_y1:
-                            # print("nl")
-                            all_span.append(span_curr)
+                    # print(span)
+                    if span["spans"]:
+                        if enumspan == 0:
+                            span_y1 = span["spans"][0]["bbox"][3]
                             span_curr = [span]
                         else:
-                            span_curr.append(span)
-                        span_y1 = span["spans"][0]["bbox"][3]
+                            if span["spans"][0]["bbox"][1] > span_y1:
+                                # print("nl")
+                                all_span.append(span_curr)
+                                span_curr = [span]
+                            else:
+                                span_curr.append(span)
+                            span_y1 = span["spans"][0]["bbox"][3]
                 all_span.append(span_curr)
                 return all_span
             all_span = []
@@ -436,15 +437,16 @@ class PDFExtractor:
                 all_span += block_prep(bbi)
             line_fixed = []
             for span_line in all_span:
-                all_bbox = [x["bbox"] for i in span_line for x in i["spans"]]
-                max_bbox = (
-                    min(all_bbox)[0],
-                    min(all_bbox)[1],
-                    max(all_bbox)[2],
-                    max(all_bbox)[3],
-                )
-                new_line_dict = {"bbox": max_bbox, "lines": span_line}
-                line_fixed.append(new_line_dict)
+                if span_line:
+                    all_bbox = [x["bbox"] for i in span_line for x in i["spans"]]
+                    max_bbox = (
+                        min(all_bbox)[0],
+                        min(all_bbox)[1],
+                        max(all_bbox)[2],
+                        max(all_bbox)[3],
+                    )
+                    new_line_dict = {"bbox": max_bbox, "lines": span_line}
+                    line_fixed.append(new_line_dict)
             return line_fixed
 
         def markdown_formatting(text, flag, type):
@@ -579,6 +581,9 @@ class PDFExtractor:
         if doc is None:
             return [], []
 
+        text_list = []
+        text_list_md = []
+
         for page in doc:
             clip_rect = self._create_clipping_rectangle(page)
             page.add_rect_annot(clip_rect)
@@ -597,20 +602,18 @@ class PDFExtractor:
             
             page.apply_redactions()  # erase all table text
             
-            #? Debugging
+            # # #? Debugging
             # self._show_image(page, title=f"Page",grayscale=False)
             
-            text_list = []
-            text_list_md = []
-            for page_num, page in enumerate(doc):
-                dict_test = page.get_textpage().extractDICT(sort=True)
-                # print(dict_test)
+            # for page_num, page in enumerate(doc):
+            dict_test = page.get_textpage(clip_rect).extractDICT(sort=True)
+            # print(dict_test)
 
-                line_fixed = span_prep(dict_test)
+            line_fixed = span_prep(dict_test)
 
-                plain_block,md_block = proc_text(line_fixed)
-                text_list += plain_block
-                text_list_md += md_block
+            plain_block,md_block = proc_text(line_fixed)
+            text_list += plain_block
+            text_list_md += md_block
 
             plain = [clean_regex("".join(line)) for line in text_list ]
             markdown = [clean_regex("".join(line)) for line in text_list_md ]
