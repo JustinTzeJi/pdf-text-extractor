@@ -563,7 +563,15 @@ class PDFExtractor:
             return block_text, block_text_md
 
         def clean_regex(text):
+            def clean_num_bold(t):
+                return t.group(0)[3:] + "**"
+            def clean_num_italics(t):
+                return t.group(0)[2:] + "_"
             regex_checklist = [
+                (r"[\*]{2}\n\d{1,3}[\.|\)](\s|[\*]{2})", clean_num_bold),
+                (r"\_\n\d{1,3}[\.|\)](\s|\_)", clean_num_italics),
+                (r"[\*]{2}\n\d{1,3}[\.|\)]\s", clean_num_bold),
+                (r"\_\n\d{1,3}[\.|\)\s]", clean_num_italics),
                 (r"[\*]{4}", ""),
                 (r"[\*]{2}\.", "**."),
                 (r"[\*]{2}\s*[\*]{2}", " "),
@@ -738,7 +746,7 @@ class PDFExtractor:
     #             with open(self.input_path / img_name, "wb") as f:
     #                 f.write(imgdata)
             
-        return zip(image_urls,image_names)
+    #     return zip(image_urls,image_names)
 
 
     def create_content_model(self, plain: List[str], markdown: List[str]) -> contentModel:
