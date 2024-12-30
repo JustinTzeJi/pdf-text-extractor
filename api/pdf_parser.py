@@ -392,205 +392,6 @@ class PDFExtractor:
         final_end = min(height, content_end + safety_margin)
         
         return mupdf.Rect(0, final_start, width, final_end)
-    
-    def _process_rects(
-            self,
-            rects: List[mupdf.Rect],
-            expansion_percent: float = 10,
-            threshold: float = 5,
-            x_tolerance: float = 2
-        ) -> List[mupdf.Rect]:
-        """Process and merge rectangles that are close to each other.
-        
-        Args:
-            rects (List[mupdf.Rect]): List of rectangles to process
-            expansion_percent (float, optional): Percentage to expand rectangles. Defaults to 10.
-            threshold (float, optional): Distance threshold for merging. Defaults to 5.
-            x_tolerance (float, optional): X-coordinate tolerance. Defaults to 2.
-
-        Returns:
-            List[mupdf.Rect]: List of processed rectangles
-        """
-        if not rects:
-            return []
-        
-        # 1. Expand rectangles vertically
-        expanded_rects = []
-        for rect in rects:
-            try:
-                height = rect.height
-                expansion = height * (expansion_percent / 100)
-                new_rect = mupdf.Rect(
-                    rect.x0,
-                    rect.y0 - expansion/2,
-                    rect.x1,
-                    rect.y1 + expansion/2
-                )
-                expanded_rects.append(new_rect)
-            except Exception as e:
-                logging.error(f"Error processing rectangle: {e}")
-                continue
-        
-        # 2. First pass: merge intersecting rectangles
-        merged_initial = []
-        rects_to_process = expanded_rects.copy()
-        
-        while rects_to_process:
-            current = rects_to_process.pop(0)
-            merged = False
-            
-            i = 0
-            while i < len(rects_to_process):
-                if current.intersects(rects_to_process[i]):
-                    current = mupdf.Rect(
-                        min(current.x0, rects_to_process[i].x0),
-                        min(current.y0, rects_to_process[i].y0),
-                        max(current.x1, rects_to_process[i].x1),
-                        max(current.y1, rects_to_process[i].y1)
-                    )
-                    rects_to_process.pop(i)
-                    merged = True
-                else:
-                    i += 1
-            
-            if merged:
-                rects_to_process.insert(0, current)
-            else:
-                merged_initial.append(current)
-        
-        # 3. Group by x-coordinates
-        x_groups = {}
-        for rect in merged_initial:
-            matched = False
-            rounded_x0 = 1
-            
-            for gx0 in x_groups.keys():
-                if abs(1 - rounded_x0) <= x_tolerance:
-                    x_groups[gx0].append(rect)
-                    matched = True
-                    break
-            
-            if not matched:
-                x_groups[rounded_x0] = [rect]
-        
-        # 4. Final merge within x-coordinate groups
-        final_rects = []
-        for group in x_groups.values():
-            if not group:
-                continue
-                
-            group.sort(key=lambda r: r.y0)
-            current = group[0]
-            merged_group = []
-            
-            for rect in group[1:]:
-                if (abs(current.y1 - rect.y0) <= threshold):
-                    current = mupdf.Rect(
-                        min(current.x0, rect.x0),
-                        min(current.y0, rect.y0),
-                        max(current.x1, rect.x1),
-                        max(current.y1, rect.y1)
-                    )
-                else:
-                    merged_group.append(current)
-                    current = rect
-                    
-            merged_group.append(current)
-            final_rects.extend(merged_group)
-        
-        return sorted(final_rects, key=lambda r: (r.y0, r.x0))
-        
-
-
-    def convert_to_markdown(self,text_blocks):
-        """
-        Converts text blocks into Markdown format.
-        Args:
-            text_blocks (list): A list of pages, where each page is a list of text blocks, 
-                                and each text block is a list of spans containing text and formatting information.
-        Returns:
-            tuple: A tuple containing two lists:
-                - all_text (list): A list of strings where each string is a page of text converted to Markdown format.
-                - all_text_plain (list): A list of strings where each string is a page of plain text without Markdown formatting.
-        The function processes each span of text within the text blocks, applying Markdown formatting for bold and italic text.
-        It also identifies and formats bullet points and numbered lists according to specified patterns.
-        """
-        
-        def _incCaps(m):
-            return "\n\n" + m.group(0)
-
-        def _add_back_whitespace(ori_text, markdowned_text):
-            if re.search(r'^\s', ori_text):
-                markdowned_text = " "+markdowned_text
-            if re.search(r'\s\Z', ori_text):
-                markdowned_text = markdowned_text+" "
-            return markdowned_text
-
-        bullet_patterns = [
-            r'(^)(?=[MDCLXVI])M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})\.\s',
-            r'(\s|^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7|Ø(\s|$)',# Matches common bullet point characters
-            r'(^)(\s|^)\d{1,3}\.(\s|$)',   # Matches numbered lists
-            r'(^)(\s|^)[MDCLXVI|mdclxvi]{1,3}\.(\s|$)',  # Matches alphabetical lists
-            r'(^)(\s|^)[MDCLXVI|mdclxvi]{1,3}\)(\s|$)',  # Matches alphabetical lists
-            # r'(\s|^)*[-*•>](\s|$)',  # Matches common bullet point characters
-            # r'(\s|^)[(]?[0-9A-Za-z]+[)](\s|$)'  # Matches parenthesized numbers or letters
-        ]
-        all_text = []
-        all_text_plain = []
-        for page in text_blocks:
-            prev_span_bbox_y0 = 0.0
-            for block_ in page:
-                block_Text = []
-                block_Text_plain = []
-                for span in block_:
-                    span_Text = ""
-                    span_Text_plain = ""
-                    if "lines" in span.keys():
-                        for line in span["lines"]:
-                            span_len = len(line["spans"])
-                            for itx_, t in enumerate(line["spans"]):
-                                filler = " "
-                                if itx_ > 0:
-                                    if abs(t["bbox"][3] - line["spans"][itx_-1]["bbox"][3]) <= 5:
-                                        filler = ""
-                                text_t = t["text"]
-                                if span_len == 1 and round(t["bbox"][1], 0) != round(prev_span_bbox_y0, 0) and not re.sub(r"\s+", "", text_t):
-                                    text_t = "\n\n"
-                                span_Text_plain += filler + text_t
-                                if t["text"].strip():
-                                    if t["flags"] & 16:
-                                        text_t = f"**{text_t.strip()}**"
-                                        text_t = _add_back_whitespace(t["text"],text_t)
-                                    elif t['flags'] & 2:
-                                        text_t = f"_{text_t.strip()}_"
-                                        text_t = _add_back_whitespace(t["text"],text_t)
-                                span_Text += filler + text_t
-
-                                prev_span_bbox_y0 = t["bbox"][1]
-                        if span_Text:
-                            cleaned_text = re.sub(r"\*\*\s\*\*"," ", span_Text)
-                            cleaned_text = re.sub(r"\*\*\s\.","**.", cleaned_text)
-                            cleaned_text = re.sub(r"\*\*\*\*"," ", cleaned_text)
-                            cleaned_text = cleaned_text.strip(" ")
-
-                            cleaned_text_plain = span_Text_plain.strip(" ")
-                            if any(re.search(pattern, cleaned_text) for pattern in bullet_patterns):
-                                for pattern_ in bullet_patterns:
-                                    if re.search(pattern_, cleaned_text):
-                                        break
-                                if pattern_ == r'(\s|^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7|Ø(\s|$)':
-                                    cleaned_text = re.sub(f"{pattern_}", "\n- ",cleaned_text)
-                                    cleaned_text_plain = re.sub(f"{pattern_}", "\n- ",cleaned_text_plain)
-                                else:
-                                    cleaned_text = re.sub(f"{pattern_}", _incCaps,cleaned_text)
-                                    cleaned_text_plain = re.sub(f"{pattern_}", _incCaps,cleaned_text_plain)
-                            cleaned_text = re.sub(r"[ \t]{2,}"," ", cleaned_text)
-                            cleaned_text_plain = re.sub(r"[ \t]{2,}"," ", cleaned_text_plain)
-                            block_Text.append(cleaned_text)
-                            block_Text_plain.append(cleaned_text_plain)
-                all_text.append(re.sub(r"\*\*\s\*\*"," " ," ".join(block_Text)))
-                all_text_plain.append(" ".join(block_Text_plain))
-        return all_text, all_text_plain
 
 
     def extract_text_with_clipping(self,doc:mupdf.Document) -> Tuple[List[str], List[str], List[str]]:
@@ -609,16 +410,196 @@ class PDFExtractor:
         >>> print(markdown[0])  # First line of markdown from the first page
         "# This is the first line of the first page of the PDF"
         """
-        plain, markdown = [],[]
-        
-        if doc is None:
-            return plain, markdown
+        def span_prep(block_dict):
+            def block_prep(block_list_dict):
+                # print(block_list_dict)
+                span_y1 = None
+                span_curr = None
+                all_span = []
+                for enumspan, span in enumerate(block_list_dict["lines"]):
+                    # print(span)
+                    if span["spans"]:
+                        if enumspan == 0:
+                            span_y1 = span["spans"][0]["bbox"][3]
+                            span_curr = [span]
+                        else:
+                            if span["spans"][0]["bbox"][1] > span_y1:
+                                # print("nl")
+                                all_span.append(span_curr)
+                                span_curr = [span]
+                            else:
+                                span_curr.append(span)
+                            span_y1 = span["spans"][0]["bbox"][3]
+                all_span.append(span_curr)
+                return all_span
+            all_span = []
+            for bbi in block_dict["blocks"]:
+                all_span += block_prep(bbi)
+            line_fixed = []
+            for span_line in all_span:
+                if span_line:
+                    all_bbox = [x["bbox"] for i in span_line for x in i["spans"]]
+                    max_bbox = (
+                        min(all_bbox)[0],
+                        min(all_bbox)[1],
+                        max(all_bbox)[2],
+                        max(all_bbox)[3],
+                    )
+                    new_line_dict = {"bbox": max_bbox, "lines": span_line}
+                    line_fixed.append(new_line_dict)
+            return line_fixed
 
-        text_blocks = []
-        for page_num, page in enumerate(doc):
-            page_blocks = []
-            rects = []
+        def markdown_formatting(text, flag, type):
+            def pattern_fix(m):
+                return "\n" + m.group(0)
+
+            bullet_patterns = r"(^)[●|•|○|·|◦|‣|∙|§||]|\\uf0b7|Ø(\s|$)" # Matches common bullet point characters
+
+            numbered_list_pattern = [
+                r'(^)(\s?)\d{1,3}\.(\s|$)',   # Matches numbered lists
+                r'(^)(\s?)\d{1,3}\)(\s|$)',   # Matches numbered lists
+                r'(^)(\s?)[XVI|xvi]{1,4}\.(\s|$)',  # Matches alphabetical lists
+                r'(^)(\s?)[XVI|xvi]{1,4}\)(\s|$)',  # Matches alphabetical lists
+            ]
+
+            cleaned_text = cleaned_text_plain = text
+            cleaned_text = re.sub(r"(\_|\—){3,}", "", cleaned_text)
+            cleaned_text = cleaned_text.replace("*",r"\*")
+            cleaned_text = cleaned_text.replace("_",r"\_")
+
+            if re.search(bullet_patterns, cleaned_text):
+                cleaned_text = re.sub(f"{bullet_patterns}", "\n- ", cleaned_text)
+                cleaned_text_plain = re.sub(f"{bullet_patterns}", "\n- ", cleaned_text_plain)
+
+            if any(re.search(pattern, cleaned_text) for pattern in numbered_list_pattern):
+                for pattern_ in numbered_list_pattern:
+                    if re.search(pattern_, cleaned_text):
+                        cleaned_text = re.sub(f"{pattern_}", pattern_fix,cleaned_text)
+                        cleaned_text_plain = re.sub(f"{pattern_}", pattern_fix,cleaned_text_plain)
+                        continue
+
+            if flag & 2**4:
+                cleaned_text = f"**{cleaned_text}**"
+                cleaned_text = re.sub(r'^\*\* ', " **", cleaned_text)
+                cleaned_text = re.sub(r'[\s]{1,}\*\*(\s?)*$', "** ", cleaned_text)
+
+            if flag & 2**1:
+                cleaned_text = f"_{cleaned_text}_"
+                cleaned_text = re.sub(r'^\_ ', " _", cleaned_text)
+                cleaned_text = re.sub(r' \_$', "_ ", cleaned_text)
+                cleaned_text = re.sub(r'[\s]{1,}\_(\s?)*$', "_ ", cleaned_text)
+
+            if type == "plain":
+                return cleaned_text_plain
+            elif type == "markdown":
+                return cleaned_text
             
+        def proc_text(line_fixed):
+            line_y = None
+            line_width = None
+            spacing_width = None
+            prev_spacing_width = 0
+            line_spacing = 0.9
+            block_text = []
+            block_text_md = []
+            line_text_plain = []
+            line_text_md = []
+            for text_line in line_fixed:
+
+                if (
+                    len(text_line["lines"]) == 1
+                    and not text_line["lines"][0]["spans"][0]["text"].strip()
+                ):
+                    continue
+                plain_str = " ".join(
+                    [
+                        markdown_formatting(x["text"], x["flags"], "plain")
+                        for i in text_line["lines"]
+                        for x in i["spans"]
+                    ]
+                )
+                markdown = " ".join(
+                    [
+                        markdown_formatting(x["text"], x["flags"], "markdown")
+                        for i in text_line["lines"]
+                        for x in i["spans"]
+                    ]
+                )
+
+                if not plain_str.strip():
+                    continue
+
+                prev_spacing_width = spacing_width
+                line_width = round(text_line["bbox"][3] - text_line["bbox"][1], 0)
+
+                if line_y:
+                    if round(text_line["bbox"][1] - line_y[1], 0) > 0:
+                        spacing_width = round(text_line["bbox"][1] - line_y[1], 0)
+                    elif round(text_line["bbox"][1] - line_y[1], 0) <= 0:
+                        # print(text_line["bbox"][3] - text_line["bbox"][1])
+                        spacing_width = round(
+                            (text_line["bbox"][3] - text_line["bbox"][1]) * 0.3, 0
+                        )
+                else:
+                    spacing_width = round(line_width * line_spacing, 0)
+
+                line_y = (text_line["bbox"][1], text_line["bbox"][3])
+
+                if prev_spacing_width:
+                    if ((spacing_width- prev_spacing_width)<= 1 )and spacing_width <= round(
+                        line_width * line_spacing, 0
+                    ):
+                        # print("same line")
+                        line_text_plain.append(plain_str)
+                        line_text_md.append(markdown)
+                    elif line_text_plain:
+                        block_text.append(line_text_plain)
+                        block_text_md.append(line_text_md)
+                        line_text_plain = [plain_str]
+                        line_text_md = [markdown]
+                else:
+                    line_text_plain.append(plain_str)
+                    line_text_md.append(markdown)
+
+            block_text.append(line_text_plain)
+            block_text_md.append(line_text_md)
+
+            return block_text, block_text_md
+
+        def clean_regex(text):
+            def clean_num_bold(t):
+                return t.group(0)[3:] + "**"
+            def clean_num_italics(t):
+                return t.group(0)[2:] + "_"
+            regex_checklist = [
+                (r"\u202c\u202d", " "),
+                (r"\u202c|\u202d", ""),
+                (r"[\*]{2}\n\d{1,3}[\.|\)](\s|[\*]{2})", clean_num_bold),
+                (r"\_\n\d{1,3}[\.|\)](\s|\_)", clean_num_italics),
+                (r"[\*]{2}\n\d{1,3}[\.|\)]\s", clean_num_bold),
+                (r"\_\n\d{1,3}[\.|\)\s]", clean_num_italics),
+                (r"[\*]{4}", ""),
+                (r"[\*]{2}\.", "**."),
+                (r"[\*]{2}\s*[\*]{2}", " "),
+                (r"[\_]{2}", ""),
+                (r"[\_]{1}\.", "_."),
+                (r"[\_]{1}\s*[\_]{1}", " "),
+                (r"[\n]{2,}",r"\n\n"),
+                (r"[ ]{2,}"," "),
+            ]
+
+            for i in regex_checklist:
+                text = re.sub(i[0],i[1], text)
+            
+            return text.strip()
+
+        if doc is None:
+            return [], []
+
+        text_list = []
+        text_list_md = []
+
+        for page in doc:
             clip_rect = self._create_clipping_rectangle(page)
             page.add_rect_annot(clip_rect)
             
@@ -636,62 +617,21 @@ class PDFExtractor:
             
             page.apply_redactions()  # erase all table text
             
-            #? Debugging
+            # # #? Debugging
             # self._show_image(page, title=f"Page",grayscale=False)
             
-            words = page.get_textpage(flags=8+32+1+2).extractBLOCKS()
-            for i, sp in enumerate(words):
-                if (sp[3] > clip_rect[1]) and (sp[1]<clip_rect[1]):
-                    list_intersect_top = list(sp)
-                    list_intersect_top[1] = clip_rect[1] 
-                    words[i] = tuple(list_intersect_top)
+            # for page_num, page in enumerate(doc):
+            dict_test = page.get_textpage(clip_rect).extractDICT(sort=True)
+            # print(dict_test)
 
-                if (sp[2] > clip_rect[2]) and (sp[0]<clip_rect[2]):
-                    list_intersect_btm = list(sp)
-                    list_intersect_btm[2] = clip_rect[2] 
-                    words[i] = tuple(list_intersect_btm)
-    
-            for block in words:
-                rect = mupdf.Rect(block[:4])
-                if re.sub(r"\s+", "", block[4]):
-                    if clip_rect.contains(rect) or (clip_rect.intersects(rect) and rect.get_area() > 0.5 * clip_rect.get_area()):
-                        rects.append(rect)
-                        page.draw_rect(rect, color=(1, 0, 0), width=2)
+            line_fixed = span_prep(dict_test)
 
-            rects.sort(key=lambda r: r.y0)
-            rect_distance = []
-            for i in range(len(rects)):
-                if i+1 < len(rects):
-                    rect_distance.append(rects[i+1][1] - rects[i][3])
-            print(f"med: {np.median(rect_distance)}")
-            print(f"mean: {np.mean(rect_distance)}")
+            plain_block,md_block = proc_text(line_fixed)
+            text_list += plain_block
+            text_list_md += md_block
 
-            if np.median(rect_distance) > 12 and np.mean(rect_distance) > 12:
-                threshold_Add = 5
-            elif np.mean(rect_distance) < 11:
-                threshold_Add = -3
-            else:
-                threshold_Add = 0
-
-            if np.median(rect_distance) < 10 or np.mean(rect_distance) < 10:
-                threshold_Add = -4
-            if any("Geologica" in str(str_) for li in doc.get_page_fonts(page_num) for str_ in li):
-                threshold_Add = -2
-            processed_rects = self._process_rects(rects, expansion_percent=10, threshold=12+threshold_Add ,x_tolerance=5)
-            for rect_ in processed_rects:
-                page.draw_rect(rect_, color=(0, 1, 0), width=2)
-                page_blocks.append(page.get_textpage(rect_).extractDICT()['blocks'])
-            
-            text_blocks.append(page_blocks)
-            
-            #? DEBUGGING
-            # if show_pages:
-                # import io
-                # image = Image.open(io.BytesIO(page.get_pixmap().tobytes("png")))
-                # image.show()
-                
-
-        markdown,plain = self.convert_to_markdown(text_blocks)
+            plain = [clean_regex(" ".join(line)) for line in text_list ]
+            markdown = [clean_regex(" ".join(line)) for line in text_list_md ]
         return plain,markdown
     
     #! Deprecated
@@ -813,7 +753,7 @@ class PDFExtractor:
     #             with open(self.input_path / img_name, "wb") as f:
     #                 f.write(imgdata)
             
-        return zip(image_urls,image_names)
+    #     return zip(image_urls,image_names)
 
 
     def create_content_model(self, plain: List[str], markdown: List[str]) -> contentModel:
