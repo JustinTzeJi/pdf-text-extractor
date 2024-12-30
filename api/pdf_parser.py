@@ -512,7 +512,11 @@ class PDFExtractor:
                 ):
                     continue
                 plain_str = " ".join(
-                    [(x["text"]) for i in text_line["lines"] for x in i["spans"]]
+                    [
+                        markdown_formatting(x["text"], x["flags"], "plain")
+                        for i in text_line["lines"]
+                        for x in i["spans"]
+                    ]
                 )
                 markdown = " ".join(
                     [
