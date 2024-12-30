@@ -511,10 +511,10 @@ class PDFExtractor:
                     and not text_line["lines"][0]["spans"][0]["text"].strip()
                 ):
                     continue
-                plain_str = "".join(
+                plain_str = " ".join(
                     [(x["text"]) for i in text_line["lines"] for x in i["spans"]]
                 )
-                markdown = "".join(
+                markdown = " ".join(
                     [
                         markdown_formatting(x["text"], x["flags"], "markdown")
                         for i in text_line["lines"]
@@ -579,12 +579,13 @@ class PDFExtractor:
                 (r"[\_]{1}\.", "_."),
                 (r"[\_]{1}\s*[\_]{1}", " "),
                 (r"[\n]{2,}",r"\n\n"),
+                ("  "," "),
             ]
 
             for i in regex_checklist:
                 text = re.sub(i[0],i[1], text)
             
-            return text
+            return text.strip()
 
         if doc is None:
             return [], []
@@ -623,8 +624,8 @@ class PDFExtractor:
             text_list += plain_block
             text_list_md += md_block
 
-            plain = [clean_regex("".join(line)) for line in text_list ]
-            markdown = [clean_regex("".join(line)) for line in text_list_md ]
+            plain = [clean_regex(" ".join(line)) for line in text_list ]
+            markdown = [clean_regex(" ".join(line)) for line in text_list_md ]
         return plain,markdown
     
     #! Deprecated
