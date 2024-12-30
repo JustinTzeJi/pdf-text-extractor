@@ -583,7 +583,7 @@ class PDFExtractor:
                 (r"[\_]{1}\.", "_."),
                 (r"[\_]{1}\s*[\_]{1}", " "),
                 (r"[\n]{2,}",r"\n\n"),
-                ("  "," "),
+                (r"[ ]{2,}"," "),
             ]
 
             for i in regex_checklist:
