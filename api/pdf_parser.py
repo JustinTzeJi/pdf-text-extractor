@@ -572,6 +572,8 @@ class PDFExtractor:
             def clean_num_italics(t):
                 return t.group(0)[2:] + "_"
             regex_checklist = [
+                (r"\u202c\u202d", " "),
+                (r"\u202c|\u202d", ""),
                 (r"[\*]{2}\n\d{1,3}[\.|\)](\s|[\*]{2})", clean_num_bold),
                 (r"\_\n\d{1,3}[\.|\)](\s|\_)", clean_num_italics),
                 (r"[\*]{2}\n\d{1,3}[\.|\)]\s", clean_num_bold),
