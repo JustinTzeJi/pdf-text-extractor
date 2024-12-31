@@ -598,6 +598,8 @@ class PDFExtractor:
 
         text_list = []
         text_list_md = []
+        plain = []
+        markdown = []
 
         for page in doc:
             clip_rect = self._create_clipping_rectangle(page)
@@ -625,13 +627,13 @@ class PDFExtractor:
             # print(dict_test)
 
             line_fixed = span_prep(dict_test)
+            if line_fixed:
+                plain_block,md_block = proc_text(line_fixed)
+                text_list += plain_block
+                text_list_md += md_block
 
-            plain_block,md_block = proc_text(line_fixed)
-            text_list += plain_block
-            text_list_md += md_block
-
-            plain = [clean_regex(" ".join(line)) for line in text_list ]
-            markdown = [clean_regex(" ".join(line)) for line in text_list_md ]
+                plain = [clean_regex(" ".join(line)) for line in text_list ]
+                markdown = [clean_regex(" ".join(line)) for line in text_list_md ]
         return plain,markdown
     
     #! Deprecated
