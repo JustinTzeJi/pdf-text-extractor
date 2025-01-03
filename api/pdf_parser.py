@@ -574,6 +574,8 @@ class PDFExtractor:
             regex_checklist = [
                 (r"\u202c\u202d", " "),
                 (r"\u202c|\u202d", ""),
+                (" \r  ", " "),
+                (r"\u2010|\u00ad",""),
                 (r"[\*]{2}\n\d{1,3}[\.|\)](\s|[\*]{2})", clean_num_bold),
                 (r"\_\n\d{1,3}[\.|\)](\s|\_)", clean_num_italics),
                 (r"[\*]{2}\n\d{1,3}[\.|\)]\s", clean_num_bold),
