@@ -416,10 +416,11 @@ class PDFExtractor:
                 span_y1 = None
                 span_curr = None
                 all_span = []
+                next_enum = 0
                 for enumspan, span in enumerate(block_list_dict["lines"]):
                     # print(span)
                     if span["spans"]:
-                        if enumspan == 0:
+                        if enumspan + next_enum== 0:
                             span_y1 = span["spans"][0]["bbox"][3]
                             span_curr = [span]
                         else:
@@ -430,6 +431,10 @@ class PDFExtractor:
                             else:
                                 span_curr.append(span)
                             span_y1 = span["spans"][0]["bbox"][3]
+                        next_enum = 0
+                    else:
+                        if enumspan == 0:
+                            next_enum = -1
                 all_span.append(span_curr)
                 return all_span
             all_span = []
