@@ -22,8 +22,8 @@ from PIL import Image, ImageFilter
 from urllib.parse import urlparse
 from typing import List, Tuple,Union
 from dotenv import load_dotenv
-from api.dbutils.scrapping_utils import get_user_agent
-from api.dbutils.data_validation import contentModel, attachementModel
+from utils.dbutils.scrapping_utils import get_user_agent
+from utils.dbutils.data_validation import contentModel, attachementModel
 
 # Set up logging
 #================================================================================================
