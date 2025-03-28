@@ -1,122 +1,234 @@
-import Image from "next/image";
-import Link from "next/link";
+"use client"
+
+import type React from "react"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useTheme } from "next-themes"
+import { Moon, Sun, Github, Copy, Check } from "lucide-react"
+import Link from "next/link"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+
+type PdfContentResponse = {
+  plain: string[]
+  markdown: string[]
+}
 
 export default function Home() {
+  const { setTheme } = useTheme()
+  const [pdfUrl, setPdfUrl] = useState<string>("")
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
+  const [generatedContent, setGeneratedContent] = useState<PdfContentResponse | null>(null)
+  const [copied, setCopied] = useState<"plain" | "markdown" | null>(null)
+
+  const handlePdfUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPdfUrl(e.target.value)
+    if (error) setError(null)
+  }
+
+  const handleCancelClick = () => {
+    setPdfUrl("")
+    setError(null)
+    setGeneratedContent(null)
+  }
+
+  const handleGenerateClick = async () => {
+    if (!pdfUrl) {
+      setError("Please enter a PDF URL")
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      setError(null)
+      setGeneratedContent(null)
+
+      // Call the FastAPI backend
+      const response = await fetch("/api/py/pdf_extract", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: pdfUrl, get_images: false}),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "Failed to extract text from PDF")
+      }
+
+      const data = await response.json()
+      setGeneratedContent(data.data.content)
+      console.log(data.data.content)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const copyToClipboard = async (type: "plain" | "markdown") => {
+    if (!generatedContent) return
+
+    const textToCopy = generatedContent[type].join("\n\n")
+    await navigator.clipboard.writeText(textToCopy)
+
+    setCopied(type)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing FastApi API&nbsp;
-          <Link href="/api/py/helloFastApi">
-            <code className="font-mono font-bold">api/index.py</code>
-          </Link>
-        </p>
-        <p className="fixed right-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing Next.js API&nbsp;
-          <Link href="/api/helloNextJs">
-            <code className="font-mono font-bold">app/api/helloNextJs</code>
-          </Link>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <div className="bg-background text-foreground min-h-screen flex flex-col flex-grow container mx-auto px-4 py-8 md:py-12">
+      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur-sm flex justify-between py-4">
+        <div className="container mx-auto px-4 mt-auto">
+          <h1 className="text-xl font-semibold">PDF Text Extractor</h1>
+          <p className="text-sm text-muted-foreground hidden sm:block">Generate descriptive alt text for your images.</p>
         </div>
-      </div>
+        <div className="mx-auto mt-auto">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                <span className="sr-only">Toggle theme</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setTheme("light")}>
+                Light
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("dark")}>
+                Dark
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("system")}>
+                System
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+      <main className="flex-grow container mx-auto py-8 md:py-12 px-4">
+        <div className="md:flex justify-between gap-12">
+          <Card className="w-full mx-auto mb-10">
+            <CardHeader>
+              <CardTitle>Extract text from PDF</CardTitle>
+              <CardDescription>Enter a URL to a PDF file to extract its content</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid w-full items-center gap-4">
+                <div className="flex flex-col space-y-1.5">
+                  <Label htmlFor="pdf-url">PDF URL</Label>
+                  <Input
+                    id="pdf-url"
+                    type="url"
+                    placeholder="https://example.com/document.pdf"
+                    value={pdfUrl}
+                    onChange={handlePdfUrlChange}
+                    disabled={isLoading}
+                  />
+                </div>
+                {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={handleCancelClick} disabled={isLoading}>
+                Clear
+              </Button>
+              <Button onClick={handleGenerateClick} disabled={isLoading || !pdfUrl}>
+                {isLoading ? "Extracting..." : "Extract Text"}
+              </Button>
+            </CardFooter>
+          </Card>
 
-      <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
+          <div className="w-full">
+            {isLoading && (
+              <Card className="w-full">
+                <CardHeader>
+                  <Skeleton className="h-6 bg-muted rounded w-3/4"></Skeleton>
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="bg-muted rounded-md mb-4 w-full h-60"></Skeleton>
+                  <div className="space-y-3 mt-4 p-3">
+                    <Skeleton className="h-4 bg-muted rounded w-1/4"></Skeleton>
+                    <Skeleton className="h-4 bg-muted rounded w-full"></Skeleton>
+                    <Skeleton className="h-4 bg-muted rounded w-5/6"></Skeleton>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800 hover:dark:bg-opacity-30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
+            {generatedContent && (
+              <Card className="w-full mx-auto mb-10">
+                <CardHeader>
+                  <CardTitle>Extracted Content</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="plain" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="plain">Plain Text</TabsTrigger>
+                      <TabsTrigger value="markdown">Markdown</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="plain" className="mt-4">
+                      <div className="relative">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2"
+                          onClick={() => copyToClipboard("plain")}
+                        >
+                          {copied === "plain" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                        <div className="bg-muted/50 p-4 rounded-md max-h-[400px] overflow-y-auto whitespace-pre-wrap text-sm">
+                          {generatedContent.plain.join("\n\n")}
+                        </div>
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="markdown" className="mt-4">
+                      <div className="relative">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2"
+                          onClick={() => copyToClipboard("markdown")}
+                        >
+                          {copied === "markdown" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                        <div className="bg-muted/50 p-4 rounded-md max-h-[400px] overflow-y-auto whitespace-pre-wrap text-sm">
+                          {generatedContent.markdown.join("\n\n")}
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+            )}
 
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+            {!isLoading && !generatedContent && (
+              <Card className="w-full border-dashed">
+                <CardContent className="flex flex-col items-center justify-center p-10 min-h-[200px]">
+                  <p className="text-muted-foreground text-center">Extracted content will appear here</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      </main>
+      <footer className="top-0 z-10 border-t bg-background/80 backdrop-blur-sm flex justify-between py-2">
+          <h1 className="text-sm font-semibold my-auto hidden sm:block">Built with the <a href="https://mesolitica.com/" className="underline underline-offset-4">PyMuPDF</a> library</h1>
+          <Button variant="ghost" asChild>
+            <Link href="https://github.com/JustinTzeJi/pdf-text-extractor">
+            <Github/> Repo
+            </Link>
+          </Button>
+      </footer>
+    </div>
   );
 }
