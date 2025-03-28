@@ -1,5 +1,5 @@
 # PDF Text Extractor
-Generate descriptive alt text for your images.
+Extract text and markdown from PDFs.
 [demo site](https://pdf.iwa.my/)
 
 ## Getting Started

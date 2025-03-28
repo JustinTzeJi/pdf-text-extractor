@@ -89,7 +89,7 @@ export default function Home() {
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur-sm flex justify-between py-4">
         <div className="container mx-auto px-4 mt-auto">
           <h1 className="text-xl font-semibold">PDF Text Extractor</h1>
-          <p className="text-sm text-muted-foreground hidden sm:block">Generate descriptive alt text for your images.</p>
+          <p className="text-sm text-muted-foreground hidden sm:block">Extract text and markdown from PDFs</p>
         </div>
         <div className="mx-auto mt-auto">
           <DropdownMenu>

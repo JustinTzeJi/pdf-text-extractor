@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
   title: "PDF Text Extractor",
-  description: "Markdown text extraction from PDF files",
+  description: "Extract text and markdown from PDFs",
 };
 
 export default function RootLayout({
