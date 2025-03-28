@@ -9,10 +9,11 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useTheme } from "next-themes"
-import { Moon, Sun, Github, Copy, Check } from "lucide-react"
-import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { useTheme } from "next-themes"
+import { Moon, Sun, Github, Copy, Check, AlertCircle, Info } from "lucide-react"
+import Link from "next/link"
 
 
 type PdfContentResponse = {
@@ -121,6 +122,13 @@ export default function Home() {
             <CardHeader>
               <CardTitle>Extract text from PDF</CardTitle>
               <CardDescription>Enter a URL to a PDF file to extract its content</CardDescription>
+              <Alert variant="default" className="my-2 py-4">
+              <Info className="relative h-4 w-4 top-0 left-0" />
+                <AlertTitle>Caveats</AlertTitle>
+                <AlertDescription>
+                  Works best for PDF with single column of text and embedded text.
+                </AlertDescription>
+              </Alert>
             </CardHeader>
             <CardContent>
               <div className="grid w-full items-center gap-4">
@@ -135,8 +143,14 @@ export default function Home() {
                     disabled={isLoading}
                   />
                 </div>
-                {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
               </div>
+              {error && <Alert variant="destructive" className="my-2 py-4">
+                <AlertCircle className="relative h-4 w-4 top-0 left-0" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>
+                    {error}
+                  </AlertDescription>
+                </Alert>}
             </CardContent>
             <CardFooter className="flex justify-between">
               <Button variant="outline" onClick={handleCancelClick} disabled={isLoading}>
