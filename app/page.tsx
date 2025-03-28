@@ -88,7 +88,7 @@ export default function Home() {
     <div className="bg-background text-foreground min-h-screen flex flex-col flex-grow container mx-auto px-4 py-8 md:py-12">
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur-sm flex justify-between py-4">
         <div className="container mx-auto px-4 mt-auto">
-          <h1 className="text-xl font-semibold">PDF</h1>
+          <h1 className="text-xl font-semibold">PDF Text Extractor</h1>
           <p className="text-sm text-muted-foreground hidden sm:block">Generate descriptive alt text for your images.</p>
         </div>
         <div className="mx-auto mt-auto">
@@ -116,8 +116,8 @@ export default function Home() {
       </header>
 
       <main className="flex-grow container mx-auto py-8 md:py-12 px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="w-full">
+        <div className="md:flex justify-between gap-12">
+          <Card className="w-full mx-auto mb-10">
             <CardHeader>
               <CardTitle>Extract text from PDF</CardTitle>
               <CardDescription>Enter a URL to a PDF file to extract its content</CardDescription>
@@ -166,7 +166,7 @@ export default function Home() {
             )}
 
             {generatedContent && (
-              <Card className="w-full">
+              <Card className="w-full mx-auto mb-10">
                 <CardHeader>
                   <CardTitle>Extracted Content</CardTitle>
                 </CardHeader>
