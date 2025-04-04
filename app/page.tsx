@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useTheme } from "next-themes"
 import { Moon, Sun, Github, Copy, Check, AlertCircle, Info } from "lucide-react"
 import Link from "next/link"
+import Markdown from "react-markdown"
 
 
 type PdfContentResponse = {
@@ -126,7 +127,10 @@ export default function Home() {
               <Info className="relative h-4 w-4 top-0 left-0" />
                 <AlertTitle>Caveats</AlertTitle>
                 <AlertDescription>
-                  Works best for PDF with single column of text and embedded text.
+                  <ol className="list-disc pl-3.5">
+                    <li>Works best for PDF with single column of text and embedded text.</li>
+                    <li>Tables and images are not parsed</li>
+                  </ol>
                 </AlertDescription>
               </Alert>
             </CardHeader>
@@ -195,7 +199,7 @@ export default function Home() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="absolute top-2 right-2"
+                          className="absolute top-2 right-3"
                           onClick={() => copyToClipboard("plain")}
                         >
                           {copied === "plain" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -210,13 +214,13 @@ export default function Home() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="absolute top-2 right-2"
+                          className="absolute top-2 right-3"
                           onClick={() => copyToClipboard("markdown")}
                         >
                           {copied === "markdown" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         </Button>
                         <div className="bg-muted/50 p-4 rounded-md max-h-[400px] overflow-y-auto whitespace-pre-wrap text-sm">
-                          {generatedContent.markdown.join("\n\n")}
+                          <Markdown>{generatedContent.markdown.join("\n\n")}</Markdown>
                         </div>
                       </div>
                     </TabsContent>
